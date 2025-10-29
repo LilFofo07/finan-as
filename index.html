@@ -358,7 +358,10 @@
 
     <!-- Script principal da aplicação (Offline) -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        // Removido o 'DOMContentLoaded' para executar imediatamente,
+        // garantindo que os botões funcionem mesmo se os CDNs falharem (offline).
+        // Como o script está no final do <body>, o DOM já está pronto.
+        (() => {
             // Chaves do LocalStorage
             const PRODUCTS_KEY = 'gerenciador_products';
             const TRANSACTIONS_KEY = 'gerenciador_transactions';
@@ -945,7 +948,7 @@
             }
             */
 
-        });
+        })(); // Fim da IIFE (Immediately Invoked Function Expression)
     </script>
 
 </body>
