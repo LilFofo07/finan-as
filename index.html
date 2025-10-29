@@ -1,967 +1,981 @@
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Produtos e Finanças</title>
-    <!-- Link para o Manifesto PWA (Removido para corrigir erro no preview) -->
-    <!-- <link rel="manifest" href="manifest.json"> -->
+import React, { useState, useEffect, useMemo } from 'react';
+/* REMOVIDO
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  onSnapshot, 
+  query, 
+  where, 
+  doc, 
+  setDoc, 
+  deleteDoc,
+  setLogLevel
+} from 'firebase/firestore';
+*/
+import { 
+  PieChart, 
+  Pie, 
+  Cell, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
+import { 
+  LayoutDashboard, 
+  Package, 
+  PlusCircle, 
+  ChevronDown, 
+  Search, 
+  Edit2, 
+  Trash2, 
+  X,
+  AlertCircle,
+  TrendingUp,
+  DollarSign,
+  Users
+} from 'lucide-react';
+
+// --- Constantes de Configuração ---
+
+// Configuração das categorias e seus campos específicos
+// Isso é o coração da lógica dinâmica do formulário
+const CATEGORY_DEFINITIONS = {
+  "Streaming": {
+    label: "Streaming (100 un)",
+    fields: ["productName", "supplier", "accountPrice", "screenPrice", "purchasePrice", "salePrice", "duration", "purchaseDate", "expirationDate", "hasAddons", "addons"]
+  },
+  "Música & Podcast": {
+    label: "Música & Podcast (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Aprendizado de Idiomas": {
+    label: "Aprendizado de Idiomas (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Cursos Online": {
+    label: "Cursos Online (50 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Preparação para Provas e Vestibulares": {
+    label: "Preparação para Provas e Vestibulares (50 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Métodos Diversos": {
+    label: "Métodos Diversos (10 un)",
+    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate"]
+  },
+  "Recarga de Celular": {
+    label: "Recarga de Celular (20 un)",
+    fields: ["productName", "supplier", "price", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Livros & Audiobooks": {
+    label: "Livros & Audiobooks (20 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Edição de Vídeo & Imagem": {
+    label: "Edição de Vídeo & Imagem (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "TV Online": {
+    label: "TV Online (10 un)",
+    fields: ["productName", "supplier", "login", "accountPrice", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Seguidores, Curtidas & Visualizações": {
+    label: "Seguidores, Curtidas & Visualizações (3 un)",
+    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "socialNetwork"]
+  },
+  "Inteligência Artificial": {
+    label: "Inteligência Artificial (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Jogos": {
+    label: "Jogos (100 un)",
+    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate", "saleDate"]
+  },
+  "Bots de Número Virtual": {
+    label: "Bots de Número Virtual (40 un)",
+    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate", "saleDate"]
+  },
+  "Planilhas": {
+    label: "Planilhas (10 un)",
+    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate"]
+  },
+  "Conteúdo Adulto": {
+    label: "Conteúdo Adulto (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Conteúdo Religioso": {
+    label: "Conteúdo Religioso (10 un)",
+    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Softwares & Licenças": {
+    label: "Softwares & Licenças (20 un)",
+    fields: ["productName", "supplier", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
+  },
+  "Aplicativos Modificados": {
+    label: "Aplicativos Modificados (100 un)",
+    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate"]
+  }
+};
+
+// Definição de todos os campos possíveis e seus rótulos em português
+const FIELD_LABELS = {
+  productName: { label: "Produto", type: "text", placeholder: "Nome do produto/serviço" },
+  supplier: { label: "Fornecedor", type: "text", placeholder: "WhatsApp, Telegram ou site" },
+  accountPrice: { label: "Preço (Conta)", type: "number", placeholder: "Valor da conta" },
+  screenPrice: { label: "Preço (Tela)", type: "number", placeholder: "Valor da tela" },
+  access: { label: "Acesso", type: "text", placeholder: "Link, usuário, etc." },
+  login: { label: "Login", type: "text", placeholder: "Usuário/Senha" },
+  price: { label: "Preço", type: "number", placeholder: "Preço do item" },
+  purchasePrice: { label: "Preço de Compra", type: "number", placeholder: "0.00" },
+  salePrice: { label: "Preço de Venda", type: "number", placeholder: "0.00" },
+  duration: { label: "Duração", type: "text", placeholder: "30 dias, 1 ano..." },
+  purchaseDate: { label: "Data de Compra", type: "date" },
+  saleDate: { label: "Data de Venda", type: "date" },
+  expirationDate: { label: "Data de Expiração", type: "date" },
+  hasAddons: { label: "Possui Add-ons?", type: "select", options: ["Não", "Sim"] },
+  addons: { label: "Lista/Qtde Add-ons", type: "text", placeholder: "Prime, Max ou 3" },
+  socialNetwork: { label: "Rede Social", type: "select", options: ["Instagram", "TikTok", "Twitter", "YouTube", "WhatsApp", "Telegram"] }
+};
+
+const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF00FF', '#00FFFF', '#FF0000', '#00FF00', '#0000FF'];
+
+// --- Componentes da UI ---
+
+/**
+ * Componente Principal - App
+ * Gerencia o estado global, autenticação e navegação.
+ */
+export default function App() {
+  const [page, setPage] = useState('dashboard'); // 'dashboard' ou 'products'
+  /* REMOVIDO
+  const [db, setDb] = useState(null);
+  const [auth, setAuth] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  */
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  /* REMOVIDO
+  const [appId, setAppId] = useState('default-app-id');
+  */
+
+  /* REMOVIDO 
+  // 1. Inicialização do Firebase e Autenticação
+  useEffect(() => {
+    try {
+      // Pega o App ID e a Config do Firebase do ambiente
+      const appIdFromEnv = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+      const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+      const firebaseConfig = JSON.parse(firebaseConfigStr);
+
+      if (!firebaseConfig.apiKey) {
+        setError("Configuração do Firebase não encontrada.");
+        setLoading(false);
+        return;
+      }
+      
+      setAppId(appIdFromEnv);
+
+      const app = initializeApp(firebaseConfig);
+      const authInstance = getAuth(app);
+      const dbInstance = getFirestore(app);
+      
+      // Habilita logs de debug do Firestore
+      // setLogLevel('debug');
+
+      setDb(dbInstance);
+      setAuth(authInstance);
+
+      // Listener de autenticação
+      const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
+        if (user) {
+          setUserId(user.uid);
+          setIsAuthReady(true);
+        } else {
+          // Tenta logar com token customizado ou anonimamente
+          try {
+            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+            if (token) {
+              await signInWithCustomToken(authInstance, token);
+            } else {
+              await signInAnonymously(authInstance);
+            }
+          } catch (authError) {
+            console.error("Erro na autenticação:", authError);
+            setError("Falha ao autenticar. Verifique a configuração do Firebase.");
+            setLoading(false);
+          }
+        }
+      });
+
+      return () => unsubscribe();
+    } catch (e) {
+      console.error("Erro ao inicializar Firebase:", e);
+      setError("Erro crítico ao carregar o app. Verifique o console.");
+      setLoading(false);
+    }
+  }, []);
+
+  // 2. Carregamento de Dados do Firestore
+  useEffect(() => {
+    if (!isAuthReady || !db || !userId) {
+      return;
+    }
+
+    setLoading(true);
     
-    <!-- Scripts externos REMOVIDOS do <head> para não bloquear o carregamento offline -->
-    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
-    
-    <!-- Configuração do Tailwind MOVIDA para o final do <body> -->
-    
-    <!-- Estilos personalizados para a barra de rolagem e fundo -->
-    <style>
-        body {
-            background-color: #000000;
-            font-family: 'Inter', sans-serif;
-        }
-        /* Estilizando a barra de rolagem para o tema Amoled */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #111;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #4F46E5; /* Cor primária */
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #6366F1; /* Cor primária hover */
-        }
-        /* Esconde o input de arquivo */
-        #import-file {
-            display: none;
-        }
-        /* Ajuste para o modal de edição não pular quando o scroll aparece */
-        #edit-product-modal.overflow-y-auto {
-            padding-right: 0 !important; 
-        }
-    </style>
-</head>
-<body class="bg-black text-gray-100 min-h-screen">
+    // Caminho da coleção privada do usuário
+    const collectionPath = `/artifacts/${appId}/users/${userId}/products`;
+    const q = query(collection(db, collectionPath));
 
-    <!-- Container Principal -->
-    <div class="container mx-auto max-w-7xl p-4 md:p-8">
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const productsData = [];
+      querySnapshot.forEach((doc) => {
+        productsData.push({ id: doc.id, ...doc.data() });
+      });
+      setProducts(productsData);
+      setLoading(false);
+    }, (err) => {
+      console.error("Erro ao buscar dados:", err);
+      setError("Não foi possível carregar os produtos. Verifique sua conexão e as regras do Firestore.");
+      setLoading(false);
+    });
 
-        <!-- Cabeçalho -->
-        <header class="mb-6">
-            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">
-                Gerenciador
-            </h1>
-            <p class="text-gray-400">Seu painel de controle de produtos e finanças (Offline).</p>
-        </header>
+    return () => unsubscribe();
+  }, [isAuthReady, db, userId, appId]);
+  */
 
-        <!-- Navegação -->
-        <nav class="mb-8 flex space-x-2 rounded-lg bg-tertiary p-2">
-            <button id="nav-products" class="nav-button flex-1 py-3 px-4 rounded-md font-medium text-sm transition-all duration-200">
-                Produtos
-            </button>
-            <button id="nav-finances" class="nav-button flex-1 py-3 px-4 rounded-md font-medium text-sm transition-all duration-200">
-                Finanças
-            </button>
-        </nav>
-        
-        <!-- Seção de Backup -->
-        <section id="backup-section" class="mb-8 bg-tertiary p-4 rounded-lg shadow-lg flex flex-col sm:flex-row gap-4">
-            <h2 class="text-lg font-semibold text-white mb-2 sm:mb-0">Backup (JSON):</h2>
-            <div class="flex-1 flex gap-4">
-                <button id="export-button" class="w-full sm:w-auto flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">
-                    Exportar Backup
-                </button>
-                <input type="file" id="import-file" accept=".json">
-                <button id="import-button" class="w-full sm:w-auto flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">
-                    Importar Backup
-                </button>
-            </div>
-        </section>
+  // 1. Carrega os produtos do localStorage ao iniciar
+  useEffect(() => {
+    setLoading(true);
+    try {
+      const savedProducts = localStorage.getItem('gestorDigitalProdutos');
+      if (savedProducts) {
+        setProducts(JSON.parse(savedProducts));
+      }
+    } catch (e) {
+      console.error("Erro ao carregar produtos do localStorage:", e);
+      setError("Não foi possível carregar seus dados salvos.");
+    }
+    setLoading(false);
+  }, []);
 
+  // 2. Salva os produtos no localStorage sempre que a lista for alterada
+  useEffect(() => {
+    try {
+      localStorage.setItem('gestorDigitalProdutos', JSON.stringify(products));
+    } catch (e) {
+      console.error("Erro ao salvar produtos no localStorage:", e);
+      setError("Não foi possível salvar suas alterações.");
+    }
+  }, [products]);
 
-        <!-- Conteúdo Principal -->
-        <main id="main-content">
+  // Funções CRUD para manipular o estado
+  const saveProduct = (productData) => {
+    setProducts(prevProducts => {
+      const existing = prevProducts.find(p => p.id === productData.id);
+      if (existing) {
+        // Editar
+        return prevProducts.map(p =>
+          p.id === productData.id ? productData : p
+        );
+      } else {
+        // Adicionar
+        return [...prevProducts, productData];
+      }
+    });
+  };
 
-            <!-- #################### -->
-            <!--   SEÇÃO DE PRODUTOS   -->
-            <!-- #################### -->
-            <section id="products-section">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    <!-- Coluna 1: Adicionar Produto -->
-                    <div class="lg:col-span-1 bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h2 class="text-2xl font-semibold mb-4 text-white">Adicionar Produto</h2>
-                        <form id="product-form" class="space-y-4">
-                            <div>
-                                <label for="product-name" class="block text-sm font-medium text-gray-300">Nome do Produto</label>
-                                <input type="text" id="product-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                            </div>
-                            
-                            <!-- Campos do Fornecedor Atualizados -->
-                            <fieldset class="border border-gray-700 rounded-md p-4 space-y-3">
-                                <legend class="px-2 text-sm font-medium text-gray-300">Dados do Fornecedor</legend>
-                                
-                                <div>
-                                    <label for="product-supplier-name" class="block text-sm font-medium text-gray-400">Nome do Fornecedor</label>
-                                    <input type="text" id="product-supplier-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
-                                <div>
-                                    <label for="product-supplier-whatsapp" class="block text-sm font-medium text-gray-400">WhatsApp (ex: 5511988887777)</label>
-                                    <input type="text" id="product-supplier-whatsapp" placeholder="Apenas números com DDD" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
-                                <div>
-                                    <label for="product-supplier-telegram" class="block text-sm font-medium text-gray-400">Telegram (ex: @usuario)</label>
-                                    <input type="text" id="product-supplier-telegram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
-                                <div>
-                                    <label for="product-supplier-instagram" class="block text-sm font-medium text-gray-400">Instagram (ex: @usuario)</label>
-                                    <input type="text" id="product-supplier-instagram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
+  const deleteProduct = (productId) => {
+    setProducts(prevProducts =>
+      prevProducts.filter(p => p.id !== productId)
+    );
+  };
 
-                            </fieldset>
-                            
-                            <!-- Campos de Preço -->
-                            <div class="flex gap-4">
-                                <div class="flex-1">
-                                    <label for="product-cost" class="block text-sm font-medium text-gray-300">Custo (R$)</label>
-                                    <input type="number" step="0.01" id="product-cost" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
-                                <div class="flex-1">
-                                    <label for="product-sale-price" class="block text-sm font-medium text-gray-300">Venda (R$)</label>
-                                    <input type="number" step="0.01" id="product-sale-price" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                </div>
-                            </div>
-
-                            <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg">
-                                Adicionar Produto
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- Coluna 2: Lista de Produtos -->
-                    <div class="lg:col-span-2 bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h2 class="text-2xl font-semibold mb-4 text-white">Inventário de Produtos</h2>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-secondary">
-                                <thead class="bg-secondary">
-                                    <tr>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Produto</th>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Fornecedor</th>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Contato</th>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Custo</th>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Venda</th>
-                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="product-list" class="divide-y divide-secondary">
-                                    <!-- Linhas de produtos serão inseridas aqui pelo JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- #################### -->
-            <!--   SEÇÃO DE FINANÇAS   -->
-            <!-- #################### -->
-            <section id="finances-section" class="hidden">
-                
-                <!-- Cards de Resumo -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h3 class="text-sm font-medium text-green-400">Total de Entradas</h3>
-                        <p id="total-entradas" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
-                    </div>
-                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h3 class="text-sm font-medium text-red-400">Total de Saídas</h3>
-                        <p id="total-saidas" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
-                    </div>
-                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h3 class="text-sm font-medium text-blue-400">Saldo Atual</h3>
-                        <p id="saldo-atual" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
-                    </div>
-                </div>
-
-                <!-- Gráfico e Transações -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <!-- Coluna 1: Gráfico -->
-                    <div class="lg:col-span-2 bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h2 class="text-2xl font-semibold mb-4 text-white">Visão Geral</h2>
-                        <div class="h-96">
-                            <canvas id="finance-chart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Coluna 2: Adicionar Transação -->
-                    <div class="lg:col-span-1 bg-tertiary p-6 rounded-lg shadow-lg">
-                        <h2 class="text-2xl font-semibold mb-4 text-white">Adicionar Transação</h2>
-                        <form id="transaction-form" class="space-y-4">
-                            <div>
-                                <label for="transaction-desc" class="block text-sm font-medium text-gray-300">Descrição</label>
-                                <input type="text" id="transaction-desc" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                            </div>
-                            <div>
-                                <label for="transaction-type" class="block text-sm font-medium text-gray-300">Tipo</label>
-                                <select id="transaction-type" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                                    <option value="entrada" class="bg-secondary text-green-400">Entrada</option>
-                                    <option value="saida" class="bg-secondary text-red-400">Saída</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="transaction-amount" class="block text-sm font-medium text-gray-300">Valor (R$)</label>
-                                <input type="number" step="0.01" id="transaction-amount" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                            </div>
-                            <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg">
-                                Adicionar Transação
-                            </button>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Lista de Transações Recentes -->
-                <div class="bg-tertiary p-6 rounded-lg shadow-lg mt-8">
-                    <h2 class="text-2xl font-semibold mb-4 text-white">Transações Recentes</h2>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-secondary">
-                            <thead class="bg-secondary">
-                                <tr>
-                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Descrição</th>
-                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Tipo</th>
-                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Valor</th>
-                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody id="transaction-list" class="divide-y divide-secondary">
-                                <!-- Linhas de transações serão inseridas aqui pelo JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- #################### -->
-    <!--        MODAIS        -->
-    <!-- #################### -->
-
-    <!-- Modal de Alerta (Substitui alert()) - RE-ADICIONADO -->
-    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h3 class="text-xl font-semibold text-white mb-4" id="alert-modal-title">Aviso</h3>
-            <p class="text-gray-300 mb-6" id="alert-modal-message">Mensagem de alerta.</p>
-            <div class="flex justify-end">
-                <button id="alert-modal-ok" class="py-2 px-4 rounded-md bg-primary hover:bg-primary-hover text-white font-bold transition-all">
-                    OK
-                </button>
-            </div>
+  // Renderização principal
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black">
+        <div className="p-6 bg-gray-900 rounded-lg shadow-md text-center">
+          <AlertCircle className="w-12 h-12 mx-auto text-red-500" />
+          <h2 className="mt-4 text-xl font-semibold text-white">Erro ao Carregar</h2>
+          <p className="mt-2 text-gray-300">{error}</p>
         </div>
-    </div>
+      </div>
+    );
+  }
 
-    <!-- Modal de Confirmação (Substitui confirm()) - RE-ADICIONADO -->
-    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
-        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
-            <h3 class="text-xl font-semibold text-white mb-4" id="confirm-modal-title">Confirmar Ação</h3>
-            <p class="text-gray-300 mb-6" id="confirm-modal-message">Tem certeza?</p>
-            <div class="flex justify-end space-x-4">
-                <button id="confirm-modal-cancel" class="py-2 px-4 rounded-md bg-secondary hover:bg-gray-600 text-white font-medium transition-all">
-                    Cancelar
-                </button>
-                <button id="confirm-modal-confirm" class="py-2 px-4 rounded-md bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
-                    Confirmar
-                </button>
-            </div>
+  /* REMOVIDO
+  if (loading && !isAuthReady) {
+  */
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-black text-white">
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-lg">Carregando dados...</p>
         </div>
-    </div>
+      </div>
+    );
+  }
 
-    <!-- Modal de Edição de Produto -->
-    <div id="edit-product-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50 overflow-y-auto">
-        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-lg my-8">
-            <h3 class="text-2xl font-semibold text-white mb-6">Editar Produto</h3>
-            <form id="edit-product-form" class="space-y-4">
-                <!-- ID do produto será armazenado aqui -->
-                <input type="hidden" id="edit-product-id">
-                
-                <div>
-                    <label for="edit-product-name" class="block text-sm font-medium text-gray-300">Nome do Produto</label>
-                    <input type="text" id="edit-product-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                </div>
-                
-                <fieldset class="border border-gray-700 rounded-md p-4 space-y-3">
-                    <legend class="px-2 text-sm font-medium text-gray-300">Dados do Fornecedor</legend>
-                    <div>
-                        <label for="edit-product-supplier-name" class="block text-sm font-medium text-gray-400">Nome do Fornecedor</label>
-                        <input type="text" id="edit-product-supplier-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                    <div>
-                        <label for="edit-product-supplier-whatsapp" class="block text-sm font-medium text-gray-400">WhatsApp</label>
-                        <input type="text" id="edit-product-supplier-whatsapp" placeholder="Apenas números com DDD" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                    <div>
-                        <label for="edit-product-supplier-telegram" class="block text-sm font-medium text-gray-400">Telegram</label>
-                        <input type="text" id="edit-product-supplier-telegram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                    <div>
-                        <label for="edit-product-supplier-instagram" class="block text-sm font-medium text-gray-400">Instagram</label>
-                        <input type="text" id="edit-product-supplier-instagram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                </fieldset>
-                
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label for="edit-product-cost" class="block text-sm font-medium text-gray-300">Custo (R$)</label>
-                        <input type="number" step="0.01" id="edit-product-cost" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                    <div class="flex-1">
-                        <label for="edit-product-sale-price" class="block text-sm font-medium text-gray-300">Venda (R$)</label>
-                        <input type="number" step="0.01" id="edit-product-sale-price" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
-                    </div>
-                </div>
-
-                <div class="flex justify-end space-x-4 pt-4">
-                    <button type="button" id="edit-modal-cancel" class="py-2 px-4 rounded-md bg-secondary hover:bg-gray-600 text-white font-medium transition-all">
-                        Cancelar
-                    </button>
-                    <button type="submit" class="py-2 px-4 rounded-md bg-primary hover:bg-primary-hover text-white font-bold transition-all">
-                        Salvar Alterações
-                    </button>
-                </div>
-            </form>
+  return (
+    <div className="flex h-screen bg-black font-inter">
+      {/* Sidebar */}
+      <nav className="w-64 bg-black text-white flex flex-col">
+        <div className="p-6 text-2xl font-bold border-b border-gray-800">
+          Gestor Digital
         </div>
-    </div>
+        <ul className="flex-1 mt-6 space-y-2">
+          <NavItem
+            icon={<LayoutDashboard />}
+            label="Dashboard"
+            isActive={page === 'dashboard'}
+            onClick={() => setPage('dashboard')}
+          />
+          <NavItem
+            icon={<Package />}
+            label="Gerenciar Produtos"
+            isActive={page === 'products'}
+            onClick={() => setPage('products')}
+          />
+        </ul>
+        <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
+          {/* REMOVIDO
+          <p>App ID: {appId.substring(0, 15)}...</p>
+          <p>User ID: {userId ? userId.substring(0, 15) + '...' : 'N/A'}</p>
+          */}
+          <p>Status: Salvo localmente</p>
+        </div>
+      </nav>
 
-
-    <!-- Configuração do Tailwind MOVIDA para cá (antes do script principal do Tailwind) -->
-    <script>
-        // Define o objeto 'tailwind' e sua propriedade 'config'
-        // Isso corrige o erro 'tailwind is not defined'
-        var tailwind = {
-            config: {
-                darkMode: 'class',
-                theme: {
-                    extend: {
-                        colors: {
-                            // Fundo preto puro para Amoled
-                            black: '#000000',
-                            // Cores vibrantes
-                            primary: {
-                                DEFAULT: '#6366F1', // Indigo-500
-                                hover: '#4F46E5'  // Indigo-600
-                            },
-                            secondary: '#1F2937', // Gray-800
-                            tertiary: '#111827', // Gray-900
-                        },
-                        fontFamily: {
-                            sans: ['Inter', 'sans-serif'],
-                        },
-                    },
-                },
-            }
-        };
-    </script>
-
-    <!-- SCRIPTS EXTERNOS MOVIDOS PARA O FIM DO BODY E MARCADOS COM 'defer' -->
-    <!-- Isso impede que eles bloqueiem a renderização e o script principal. -->
-    <script src="https://cdn.tailwindcss.com" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-
-    <!-- Script principal da aplicação (Offline) -->
-    <script>
-        // Removido o 'DOMContentLoaded' para executar imediatamente,
-        // garantindo que os botões funcionem mesmo se os CDNs falharem (offline).
-        // Como o script está no final do <body>, o DOM já está pronto.
-        (() => {
-            // Chaves do LocalStorage
-            const PRODUCTS_KEY = 'gerenciador_products';
-            const TRANSACTIONS_KEY = 'gerenciador_transactions';
-
-            // Referências do DOM (App)
-            const navProducts = document.getElementById('nav-products');
-            const navFinances = document.getElementById('nav-finances');
-            const productsSection = document.getElementById('products-section');
-            const financesSection = document.getElementById('finances-section');
-            const productForm = document.getElementById('product-form');
-            const productList = document.getElementById('product-list');
-            const transactionForm = document.getElementById('transaction-form');
-            const transactionList = document.getElementById('transaction-list');
-            const totalEntradasEl = document.getElementById('total-entradas');
-            const totalSaidasEl = document.getElementById('total-saidas');
-            const saldoAtualEl = document.getElementById('saldo-atual');
-            const exportButton = document.getElementById('export-button');
-            const importButton = document.getElementById('import-button');
-            const importFileInput = document.getElementById('import-file');
-
-            // Referências do DOM (Modais)
-            const alertModal = document.getElementById('alert-modal');
-            const alertModalTitle = document.getElementById('alert-modal-title');
-            const alertModalMessage = document.getElementById('alert-modal-message');
-            const alertModalOk = document.getElementById('alert-modal-ok');
-
-            const confirmModal = document.getElementById('confirm-modal');
-            const confirmModalTitle = document.getElementById('confirm-modal-title');
-            const confirmModalMessage = document.getElementById('confirm-modal-message');
-            const confirmModalCancel = document.getElementById('confirm-modal-cancel');
-            const confirmModalConfirm = document.getElementById('confirm-modal-confirm');
-
-            const editProductModal = document.getElementById('edit-product-modal');
-            const editProductForm = document.getElementById('edit-product-form');
-            const editModalCancel = document.getElementById('edit-modal-cancel');
-            const editProductIdInput = document.getElementById('edit-product-id');
-
-            let chartInstance = null;
-
-            // --- LÓGICA DOS MODAIS ---
-
-            // Modal de Alerta (substitui alert())
-            function showAlert(title, message) {
-                alertModalTitle.textContent = title;
-                alertModalMessage.textContent = message;
-                alertModal.classList.remove('hidden');
-            }
-            alertModalOk.addEventListener('click', () => alertModal.classList.add('hidden'));
-
-            // Modal de Confirmação (substitui confirm())
-            let confirmCallback = null;
-            function openConfirmModal(title, message, confirmText = 'Confirmar', onConfirm) {
-                confirmModalTitle.textContent = title;
-                confirmModalMessage.textContent = message;
-                confirmModalConfirm.textContent = confirmText;
-                confirmCallback = onConfirm; // Armazena o callback
-
-                // Ajusta a cor do botão de confirmação
-                if (confirmText.toLowerCase() === 'excluir') {
-                    confirmModalConfirm.classList.remove('bg-primary', 'hover:bg-primary-hover', 'bg-blue-600', 'hover:bg-blue-700');
-                    confirmModalConfirm.classList.add('bg-red-600', 'hover:bg-red-700');
-                } else {
-                    confirmModalConfirm.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    confirmModalConfirm.classList.add('bg-primary', 'hover:bg-primary-hover');
-                }
-                
-                confirmModal.classList.remove('hidden');
-            }
-
-            function closeConfirmModal() {
-                confirmModal.classList.add('hidden');
-                confirmCallback = null;
-            }
-
-            confirmModalCancel.addEventListener('click', closeConfirmModal);
-            confirmModalConfirm.addEventListener('click', () => {
-                if (typeof confirmCallback === 'function') {
-                    confirmCallback();
-                }
-                closeConfirmModal();
-            });
-
-            // Modal de Edição de Produto
-            function openEditModal(productId) {
-                const products = getProducts();
-                const product = products.find(p => p.id === productId);
-                if (!product) {
-                    showAlert('Erro', 'Produto não encontrado.');
-                    return;
-                }
-                
-                // Preenche o formulário
-                editProductIdInput.value = product.id;
-                document.getElementById('edit-product-name').value = product.name;
-                document.getElementById('edit-product-supplier-name').value = product.supplier.name;
-                document.getElementById('edit-product-supplier-whatsapp').value = product.supplier.whatsapp || '';
-                document.getElementById('edit-product-supplier-telegram').value = product.supplier.telegram || '';
-                document.getElementById('edit-product-supplier-instagram').value = product.supplier.instagram || '';
-                document.getElementById('edit-product-cost').value = product.cost;
-                document.getElementById('edit-product-sale-price').value = product.salePrice;
-                
-                editProductModal.classList.remove('hidden');
-            }
-
-            function closeEditModal() {
-                editProductModal.classList.add('hidden');
-                editProductForm.reset();
-            }
-
-            editModalCancel.addEventListener('click', closeEditModal);
-
-            editProductForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const id = editProductIdInput.value;
-                const products = getProducts();
-                const productIndex = products.findIndex(p => p.id === id);
-
-                if (productIndex === -1) {
-                    showAlert('Erro', 'Não foi possível salvar as alterações. Produto não encontrado.');
-                    return;
-                }
-
-                // Atualiza o objeto do produto
-                products[productIndex] = {
-                    ...products[productIndex], // Mantém ID e createdAt
-                    name: document.getElementById('edit-product-name').value,
-                    supplier: {
-                        name: document.getElementById('edit-product-supplier-name').value,
-                        whatsapp: document.getElementById('edit-product-supplier-whatsapp').value,
-                        telegram: document.getElementById('edit-product-supplier-telegram').value,
-                        instagram: document.getElementById('edit-product-supplier-instagram').value
-                    },
-                    cost: parseFloat(document.getElementById('edit-product-cost').value),
-                    salePrice: parseFloat(document.getElementById('edit-product-sale-price').value)
-                };
-
-                saveProducts(products); // Salva o array atualizado
-                closeEditModal();
-                loadProducts(); // Recarrega a lista na UI
-                showAlert('Sucesso', 'Produto atualizado!');
-            });
-
-            // Função para formatar moeda
-            const formatCurrency = (value) => {
-                return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            };
-
-            // --- LÓGICA DE NAVEGAÇÃO ---
-            function showProducts() {
-                productsSection.classList.remove('hidden');
-                financesSection.classList.add('hidden');
-                navProducts.classList.add('bg-primary', 'text-white');
-                navFinances.classList.remove('bg-primary', 'text-white');
-                navFinances.classList.add('text-gray-400', 'hover:bg-secondary');
-            }
-
-            function showFinances() {
-                productsSection.classList.add('hidden');
-                financesSection.classList.remove('hidden');
-                navFinances.classList.add('bg-primary', 'text-white');
-                navProducts.classList.remove('bg-primary', 'text-white');
-                navProducts.classList.add('text-gray-400', 'hover:bg-secondary');
-            }
-
-            navProducts.addEventListener('click', showProducts);
-            navFinances.addEventListener('click', showFinances);
-
-            // --- LÓGICA DO GRÁFICO ---
-            function initChart() {
-                // VERIFICAÇÃO OFFLINE: Só roda se o Chart.js carregou (Adicionado de volta)
-                if (typeof Chart === 'undefined') {
-                    console.warn('Chart.js não carregado. Gráfico desabilitado (modo offline?).');
-                    try {
-                        // Se estiver offline, exibe uma mensagem no canvas
-                        const canvas = document.getElementById('finance-chart');
-                        const ctx = canvas.getContext('2d');
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.fillStyle = '#4B5563'; // gray-600
-                        ctx.font = '16px Inter';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('Gráfico indisponível (offline)', canvas.width / 2, canvas.height / 2);
-                    } catch (e) {
-                        // ignora se o canvas não estiver pronto ou visível
-                    }
-                    return; // Aborta a função
-                }
-
-                // Se o Chart existe, continua
-                const ctx = document.getElementById('finance-chart').getContext('2d');
-                if (chartInstance) {
-                    chartInstance.destroy();
-                }
-                chartInstance = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: ['Entradas', 'Saídas'],
-                        datasets: [{
-                            label: 'Finanças',
-                            data: [0, 0],
-                            backgroundColor: ['#10B981', '#EF4444'],
-                            borderColor: '#000000',
-                            borderWidth: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: { color: '#D1D5DB' }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: (context) => `${context.label}: ${formatCurrency(context.raw)}`
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            function updateChart(entradas, saidas) {
-                // VERIFICAÇÃO OFFLINE: (Adicionado de volta)
-                if (typeof Chart === 'undefined') {
-                    return; // Aborta
-                }
-                
-                if (!chartInstance) initChart();
-                
-                // VERIFICAÇÃO Pós-init: (Adicionado de volta)
-                if (!chartInstance) {
-                    // Se o chartInstance ainda é nulo (init falhou)
-                    return; 
-                }
-
-                chartInstance.data.datasets[0].data = [entradas, saidas];
-                chartInstance.update();
-            }
-
-            // --- LÓGICA DE DADOS (LocalStorage) ---
-
-            // Funções de Leitura/Escrita
-            const getProducts = () => JSON.parse(localStorage.getItem(PRODUCTS_KEY)) || [];
-            const saveProducts = (products) => localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-            
-            const getTransactions = () => JSON.parse(localStorage.getItem(TRANSACTIONS_KEY)) || [];
-            const saveTransactions = (transactions) => localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
-
-            // Atualiza toda a UI
-            function updateUI() {
-                loadProducts();
-                loadTransactions();
-            }
-
-            // --- LÓGICA DE PRODUTOS ---
-            productForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const name = document.getElementById('product-name').value;
-                const cost = parseFloat(document.getElementById('product-cost').value);
-                const salePrice = parseFloat(document.getElementById('product-sale-price').value);
-
-                // Novos campos do fornecedor
-                const supplierName = document.getElementById('product-supplier-name').value;
-                const supplierWhatsapp = document.getElementById('product-supplier-whatsapp').value;
-                const supplierTelegram = document.getElementById('product-supplier-telegram').value;
-                const supplierInstagram = document.getElementById('product-supplier-instagram').value;
-
-
-                if (!name || !supplierName || isNaN(cost) || isNaN(salePrice)) return;
-
-                const products = getProducts();
-                const newProduct = {
-                    id: crypto.randomUUID(), // ID único
-                    name,
-                    supplier: { // Salva como objeto
-                        name: supplierName,
-                        whatsapp: supplierWhatsapp,
-                        telegram: supplierTelegram,
-                        instagram: supplierInstagram
-                    },
-                    cost,
-                    salePrice,
-                    createdAt: new Date().toISOString()
-                };
-                
-                products.push(newProduct);
-                saveProducts(products);
-                productForm.reset();
-                loadProducts(); // Apenas atualiza a lista de produtos
-            });
-
-            function loadProducts() {
-                let products = getProducts();
-                let needsSave = false;
-
-                // --- Migração de Dados ---
-                products.forEach(p => {
-                    if (p.supplier && typeof p.supplier === 'string') {
-                        p.supplier = {
-                            name: p.supplier,
-                            whatsapp: '',
-                            telegram: '',
-                            instagram: ''
-                        };
-                        needsSave = true;
-                    }
-                });
-
-                if (needsSave) {
-                    saveProducts(products);
-                }
-                // --- Fim da Migração ---
-
-
-                productList.innerHTML = '';
-                if (products.length === 0) {
-                    productList.innerHTML = '<tr><td colspan="6" class="py-4 px-4 text-center text-gray-500">Nenhum produto cadastrado.</td></tr>';
-                    return;
-                }
-                products.forEach(p => renderProductRow(p));
-            }
-
-            function renderProductRow(product) {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-secondary transition-colors";
-                
-                // Sanitização dos contatos
-                const whatsappNumber = (product.supplier.whatsapp || '').replace(/[\s()+-]/g, '');
-                const telegramUser = (product.supplier.telegram || '').replace('@', '');
-                const instagramUser = (product.supplier.instagram || '').replace('@', '');
-
-                // Cria os botões de contato
-                let contactButtons = '';
-                if (whatsappNumber) {
-                    contactButtons += `<a href="https://wa.me/${whatsappNumber}" target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1 px-2 rounded-md mr-1">WhatsApp</a>`;
-                }
-                if (telegramUser) {
-                    contactButtons += `<a href="https://t.me/${telegramUser}" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-1 px-2 rounded-md mr-1">Telegram</a>`;
-                }
-                if (instagramUser) {
-                    contactButtons += `<a href="https://instagram.com/${instagramUser}" target="_blank" class="inline-block bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold py-1 px-2 rounded-md">Instagram</a>`;
-                }
-                if (contactButtons === '') {
-                    contactButtons = '<span class="text-xs text-gray-500">N/A</span>';
-                }
-
-                tr.innerHTML = `
-                    <td class="py-4 px-4 text-sm font-medium text-white">${product.name}</td>
-                    <td class="py-4 px-4 text-sm text-gray-300">${product.supplier.name}</td>
-                    <td class="py-4 px-4 text-sm">${contactButtons}</td>
-                    <td class="py-4 px-4 text-sm text-red-400">${formatCurrency(product.cost)}</td>
-                    <td class="py-4 px-4 text-sm text-green-400">${formatCurrency(product.salePrice)}</td>
-                    <td class="py-4 px-4 text-sm">
-                        <button data-id="${product.id}" class="edit-product text-blue-400 hover:text-blue-300 font-medium p-1" title="Editar">
-                            <!-- Ícone de Edição (Lápis) -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                        </button>
-                        <button data-id="${product.id}" class="delete-product text-red-500 hover:text-red-400 font-medium p-1" title="Excluir">
-                            <!-- Ícone de Exclusão (Lixeira) -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </td>
-                `;
-                
-                // Listener para Excluir Produto
-                tr.querySelector('.delete-product').addEventListener('click', (e) => {
-                    const id = e.currentTarget.dataset.id;
-                    openConfirmModal(
-                        'Excluir Produto',
-                        'Tem certeza que deseja excluir este produto?',
-                        'Excluir',
-                        () => {
-                            let products = getProducts();
-                            products = products.filter(p => p.id !== id);
-                            saveProducts(products);
-                            loadProducts(); // Recarrega a lista
-                        }
-                    );
-                });
-                
-                // Listener para Editar Produto
-                tr.querySelector('.edit-product').addEventListener('click', (e) => {
-                    const id = e.currentTarget.dataset.id;
-                    openEditModal(id);
-                });
-                
-                productList.appendChild(tr);
-            }
-
-            // --- LÓGICA DE FINANÇAS ---
-            transactionForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const description = document.getElementById('transaction-desc').value;
-                const type = document.getElementById('transaction-type').value;
-                const amount = parseFloat(document.getElementById('transaction-amount').value);
-
-                if (!description || isNaN(amount) || amount <= 0) return;
-
-                const transactions = getTransactions();
-                const newTransaction = {
-                    id: crypto.randomUUID(),
-                    description,
-                    type,
-                    amount,
-                    createdAt: new Date().toISOString()
-                };
-
-                transactions.push(newTransaction);
-                saveTransactions(transactions);
-                transactionForm.reset();
-                loadTransactions(); // Apenas atualiza finanças
-            });
-
-            function loadTransactions() {
-                const transactions = getTransactions();
-                transactionList.innerHTML = '';
-                let totalEntradas = 0;
-                let totalSaidas = 0;
-
-                if (transactions.length === 0) {
-                    transactionList.innerHTML = '<tr><td colspan="4" class="py-4 px-4 text-center text-gray-500">Nenhuma transação registrada.</td></tr>';
-                } else {
-                    transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                    transactions.forEach(t => {
-                        renderTransactionRow(t);
-                        if (t.type === 'entrada') {
-                            totalEntradas += t.amount;
-                        } else {
-                            totalSaidas += t.amount;
-                        }
-                    });
-                }
-                
-                const saldo = totalEntradas - totalSaidas;
-                totalEntradasEl.textContent = formatCurrency(totalEntradas);
-                totalSaidasEl.textContent = formatCurrency(totalSaidas);
-                saldoAtualEl.textContent = formatCurrency(saldo);
-                
-                updateChart(totalEntradas, totalSaidas);
-            }
-
-            function renderTransactionRow(transaction) {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-secondary transition-colors";
-                
-                const amountClass = transaction.type === 'entrada' ? 'text-green-400' : 'text-red-400';
-                const typeText = transaction.type === 'entrada' ? 'Entrada' : 'Saída';
-
-                tr.innerHTML = `
-                    <td class="py-4 px-4 text-sm font-medium text-white">${transaction.description}</td>
-                    <td class="py-4 px-4 text-sm ${amountClass}">${typeText}</td>
-                    <td class="py-4 px-4 text-sm font-medium ${amountClass}">${formatCurrency(transaction.amount)}</td>
-                    <td class="py-4 px-4 text-sm">
-                        <button data-id="${transaction.id}" class="delete-transaction text-red-500 hover:text-red-400 font-medium p-1" title="Excluir">
-                            <!-- Ícone de Exclusão (Lixeira) -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                    </td>
-                `;
-
-                tr.querySelector('.delete-transaction').addEventListener('click', (e) => {
-                    const id = e.currentTarget.dataset.id;
-                    openConfirmModal(
-                        'Excluir Transação',
-                        'Tem certeza que deseja excluir esta transação?',
-                        'Excluir',
-                        () => {
-                            let transactions = getTransactions();
-                            transactions = transactions.filter(t => t.id !== id);
-                            saveTransactions(transactions);
-                            loadTransactions(); // Recarrega finanças
-                        }
-                    );
-                });
-
-                transactionList.appendChild(tr);
-            }
-
-            // --- LÓGICA DE BACKUP (JSON) ---
-            
-            // Exportar
-            exportButton.addEventListener('click', () => {
-                try {
-                    const data = {
-                        products: getProducts(),
-                        transactions: getTransactions()
-                    };
-                    
-                    const jsonData = JSON.stringify(data, null, 2);
-                    const blob = new Blob([jsonData], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `backup_gerenciador_${new Date().toISOString().split('T')[0]}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                } catch (error) {
-                    console.error("Erro ao exportar JSON:", error);
-                    showAlert('Erro de Exportação', 'Não foi possível gerar o arquivo de backup.');
-                }
-            });
-
-            // Importar (Botão que clica no input escondido)
-            importButton.addEventListener('click', () => {
-                importFileInput.click(); // Abre o seletor de arquivos
-            });
-
-            // Processar o arquivo selecionado
-            importFileInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
-
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        if (data && Array.isArray(data.products) && Array.isArray(data.transactions)) {
-                            
-                            // Migração de dados na importação
-                            data.products.forEach(p => {
-                                if (p.supplier && typeof p.supplier === 'string') {
-                                    p.supplier = {
-                                        name: p.supplier,
-                                        whatsapp: '',
-                                        telegram: '',
-                                        instagram: ''
-                                    };
-                                }
-                            });
-                            
-                            openConfirmModal(
-                                'Importar Backup',
-                                'Isso irá sobrescrever todos os dados atuais. Deseja continuar?',
-                                'Importar',
-                                () => {
-                                    saveProducts(data.products);
-                                    saveTransactions(data.transactions);
-                                    updateUI(); // Atualiza toda a tela
-                                    showAlert('Sucesso', 'Backup importado com sucesso!');
-                                }
-                            );
-
-                        } else {
-                            showAlert('Erro de Importação', 'Arquivo de backup inválido ou mal formatado.');
-                        }
-                    } catch (error) {
-                        console.error("Erro ao importar JSON:", error);
-                        showAlert('Erro de Importação', 'Não foi possível ler o arquivo de backup.');
-                    } finally {
-                        importFileInput.value = '';
-                    }
-                };
-                reader.readAsText(file);
-            });
-
-            // --- INICIALIZAÇÃO DA APLICAÇÃO ---
-            initChart();
-            updateUI();
-            showProducts(); // Define a aba inicial
-
-            // --- REGISTRO DO SERVICE WORKER (PWA) ---
-            // Bloco removido para corrigir o erro no preview.
-            /*
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./sw.js')
-                        .then(registration => {
-                            console.log('Service Worker registrado com sucesso:', registration.scope);
-                        })
-                        .catch(error => {
-                            console.error('Falha ao registrar Service Worker:', error);
-                        });
-                });
-            }
+      {/* Conteúdo Principal */}
+      <main className="flex-1 overflow-y-auto p-8 text-white">
+        {page === 'dashboard' && <Dashboard products={products} />}
+        {page === 'products' && (
+          <ProductManager 
+            products={products}
+            loading={loading}
+            /* REMOVIDO
+            db={db}
+            userId={userId}
+            appId={appId} 
             */
+            onSaveProduct={saveProduct}
+            onDeleteProduct={deleteProduct}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
 
-        })(); // Fim da IIFE (Immediately Invoked Function Expression)
-    </script>
+/**
+ * Componente NavItem (Item da Sidebar)
+ */
+function NavItem({ icon, label, isActive, onClick }) {
+  return (
+    <li>
+      <button
+        onClick={onClick}
+        className={`flex items-center w-full px-6 py-3 text-left transition-colors duration-200 ${
+          isActive
+            ? 'bg-blue-600 text-white'
+            : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+        }`}
+      >
+        {React.cloneElement(icon, { className: 'w-5 h-5 mr-3' })}
+        <span className="font-medium">{label}</span>
+      </button>
+    </li>
+  );
+}
 
-</body>
-</html>
+/**
+ * Componente Dashboard
+ * Exibe gráficos e estatísticas.
+ */
+function Dashboard({ products }) {
+  
+  // Memoiza os dados dos gráficos para evitar recálculos
+  const { kpiData, categoryData, salesData, expiringSoon } = useMemo(() => {
+    const totalPurchase = products.reduce((sum, p) => sum + (Number(p.purchasePrice) || 0), 0);
+    const totalSale = products.reduce((sum, p) => sum + (Number(p.salePrice) || 0), 0);
+    const potentialProfit = totalSale - totalPurchase;
+    
+    const kpiData = [
+      { title: "Total de Produtos", value: products.length, icon: <Package className="w-6 h-6 text-blue-500" /> },
+      { title: "Valor Venda (Total)", value: `R$ ${totalSale.toFixed(2)}`, icon: <DollarSign className="w-6 h-6 text-green-500" /> },
+      { title: "Lucro Potencial", value: `R$ ${potentialProfit.toFixed(2)}`, icon: <TrendingUp className="w-6 h-6 text-yellow-500" /> },
+    ];
+    
+    const categoryCounts = products.reduce((acc, p) => {
+      const categoryName = p.category || "Sem Categoria";
+      acc[categoryName] = (acc[categoryName] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const categoryData = Object.keys(categoryCounts).map(name => ({
+      name: CATEGORY_DEFINITIONS[name]?.label || name,
+      value: categoryCounts[name]
+    }));
+
+    const salesByCategory = products.reduce((acc, p) => {
+      const categoryName = p.category || "Sem Categoria";
+      const salePrice = Number(p.salePrice) || 0;
+      acc[categoryName] = (acc[categoryName] || 0) + salePrice;
+      return acc;
+    }, {});
+
+    const salesData = Object.keys(salesByCategory).map(name => ({
+      name: CATEGORY_DEFINITIONS[name]?.label.split(' ')[0] || name, // Nome curto
+      "Valor de Venda": salesByCategory[name]
+    }));
+    
+    const today = new Date();
+    const next7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    const expiringSoon = products
+      .filter(p => {
+        if (!p.expirationDate) return false;
+        try {
+          const expDate = new Date(p.expirationDate + "T00:00:00"); // Adiciona T00:00:00 para datas locais
+          return expDate >= today && expDate <= next7Days;
+        } catch (e) {
+          return false;
+        }
+      })
+      .sort((a, b) => new Date(a.expirationDate) - new Date(b.expirationDate));
+
+    return { kpiData, categoryData, salesData, expiringSoon };
+  }, [products]);
+
+  return (
+    <div className="space-y-8">
+      <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
+      
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {kpiData.map(item => (
+          <div key={item.title} className="p-6 bg-gray-900 rounded-lg shadow-lg flex items-center space-x-4">
+            <div className="p-3 bg-gray-800 rounded-full">{item.icon}</div>
+            <div>
+              <p className="text-sm font-medium text-gray-400">{item.title}</p>
+              <p className="text-2xl font-bold text-white">{item.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold text-white mb-4">Produtos por Categoria</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={categoryData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={110}
+                fill="#8884d8"
+                labelLine={false}
+                label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+              >
+                {categoryData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                formatter={(value) => [value, "Produtos"]} 
+                contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: '8px' }}
+                itemStyle={{ color: '#d1d5db' }}
+              />
+              <Legend wrapperStyle={{ color: '#9ca3af' }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
+          <h2 className="text-xl font-semibold text-white mb-4">Valor de Venda por Categoria</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={salesData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
+              <XAxis dataKey="name" fontSize={10} tick={{ fill: '#9ca3af' }} />
+              <YAxis tick={{ fill: '#9ca3af' }} />
+              <Tooltip 
+                formatter={(value) => [`R$ ${value.toFixed(2)}`, "Valor de Venda"]} 
+                contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: '8px' }}
+                itemStyle={{ color: '#d1d5db' }}
+              />
+              <Legend wrapperStyle={{ color: '#9ca3af' }} />
+              <Bar dataKey="Valor de Venda" fill="#00C49F" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Tabela de Itens Expirando */}
+      <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
+        <h2 className="text-xl font-semibold text-white mb-4">Itens Expirando em Breve (Próximos 7 dias)</h2>
+        {expiringSoon.length === 0 ? (
+          <p className="text-gray-400">Nenhum item expirando nos próximos 7 dias.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-800">
+                  <th className="p-3 text-sm font-semibold text-gray-300">Produto</th>
+                  <th className="p-3 text-sm font-semibold text-gray-300">Categoria</th>
+                  <th className="p-3 text-sm font-semibold text-gray-300">Data de Expiração</th>
+                  <th className="p-3 text-sm font-semibold text-gray-300">Preço Venda</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {expiringSoon.map(p => (
+                  <tr key={p.id} className="hover:bg-gray-800">
+                    <td className="p-3 text-sm text-gray-200">{p.productName}</td>
+                    <td className="p-3 text-sm text-gray-200">{CATEGORY_DEFINITIONS[p.category]?.label || p.category}</td>
+                    <td className="p-3 text-sm text-red-400 font-medium">{formatDate(p.expirationDate)}</td>
+                    <td className="p-3 text-sm text-gray-200">R$ {Number(p.salePrice || 0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Componente ProductManager
+ * Gerencia a lista, filtros e modal de adição/edição.
+ */
+function ProductManager({ products, loading, /* db, userId, appId, */ onSaveProduct, onDeleteProduct }) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Memoiza a lista de produtos filtrados
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const categoryMatch = filterCategory === 'all' || p.category === filterCategory;
+      const searchMatch = !searchTerm || 
+        (p.productName && p.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (p.supplier && p.supplier.toLowerCase().includes(searchTerm.toLowerCase()));
+      return categoryMatch && searchMatch;
+    });
+  }, [products, filterCategory, searchTerm]);
+
+  const handleAddNew = () => {
+    setEditingProduct(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (productId) => {
+    // Substitui o confirm() por uma lógica de UI (a ser implementada, por ex. um 2º modal)
+    // Por enquanto, apenas executa a deleção.
+    /* REMOVIDO
+    if (!db || !userId) return;
+    try {
+      const docPath = `/artifacts/${appId}/users/${userId}/products/${productId}`;
+      await deleteDoc(doc(db, docPath));
+    } catch (e) {
+      console.error("Erro ao deletar produto:", e);
+      // Aqui você poderia setar um estado de erro para o usuário
+    }
+    */
+    // Apenas chama a função passada por props
+    onDeleteProduct(productId);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-100">Gerenciar Produtos</h1>
+        <button
+          onClick={handleAddNew}
+          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
+        >
+          <PlusCircle className="w-5 h-5 mr-2" />
+          Adicionar Produto
+        </button>
+      </div>
+
+      {/* Filtros */}
+      <div className="p-4 bg-gray-900 rounded-lg shadow-md flex items-center space-x-4">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            placeholder="Buscar por nome ou fornecedor..."
+            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 placeholder-gray-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        </div>
+        <div className="relative">
+          <select
+            className="appearance-none w-64 bg-gray-800 text-white border-gray-700 border rounded-lg pl-4 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="all">Todas as Categorias</option>
+            {Object.keys(CATEGORY_DEFINITIONS).map(key => (
+              <option key={key} value={key}>{CATEGORY_DEFINITIONS[key].label}</option>
+            ))}
+          </select>
+          <ChevronDown className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        </div>
+      </div>
+
+      {/* Tabela de Produtos */}
+      <DynamicProductTable 
+        products={filteredProducts}
+        loading={loading}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
+
+      {/* Modal */}
+      {isModalOpen && (
+        <ProductModal
+          productToEdit={editingProduct}
+          onClose={() => setIsModalOpen(false)}
+          /* REMOVIDO
+          db={db}
+          userId={userId}
+          appId={appId}
+          */
+          onSave={onSaveProduct}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Componente DynamicProductTable
+ * Exibe a tabela de produtos, adaptando colunas se necessário (simplificado por agora).
+ */
+function DynamicProductTable({ products, loading, onEdit, onDelete }) {
+  
+  // Colunas comuns a serem exibidas
+  const columns = [
+    { key: "productName", label: "Produto" },
+    { key: "category", label: "Categoria" },
+    { key: "supplier", label: "Fornecedor" },
+    { key: "purchasePrice", label: "Preço Compra" },
+    { key: "salePrice", label: "Preço Venda" },
+    { key: "expirationDate", label: "Expiração" },
+  ];
+
+  const formatCell = (product, colKey) => {
+    const value = product[colKey];
+    switch(colKey) {
+      case 'category':
+        return CATEGORY_DEFINITIONS[value]?.label.split(' (')[0] || value || '-';
+      case 'purchasePrice':
+      case 'salePrice':
+        return `R$ ${Number(value || 0).toFixed(2)}`;
+      case 'expirationDate':
+        return value ? formatDate(value) : '-';
+      default:
+        return value || '-';
+    }
+  };
+
+  return (
+    <div className="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead className="bg-gray-800">
+            <tr>
+              {columns.map(col => (
+                <th key={col.key} className="p-4 text-sm font-semibold text-gray-300 uppercase">
+                  {col.label}
+                </th>
+              ))}
+              <th className="p-4 text-sm font-semibold text-gray-300 uppercase text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-700">
+            {loading ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="p-4 text-center text-gray-400">
+                  Carregando produtos...
+                </td>
+              </tr>
+            ) : products.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length + 1} className="p-4 text-center text-gray-400">
+                  Nenhum produto encontrado.
+                </td>
+              </tr>
+            ) : (
+              products.map(product => (
+                <tr key={product.id} className="hover:bg-gray-800">
+                  {columns.map(col => (
+                    <td key={col.key} className="p-4 text-sm text-gray-200 whitespace-nowrap">
+                      {formatCell(product, col.key)}
+                    </td>
+                  ))}
+                  <td className="p-4 text-sm text-gray-200 whitespace-nowrap text-right">
+                    <button onClick={() => onEdit(product)} className="text-blue-400 hover:text-blue-300 mr-3 p-1">
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => onDelete(product.id)} className="text-red-400 hover:text-red-300 p-1">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Componente ProductModal
+ * Formulário dinâmico para adicionar ou editar produtos.
+ */
+function ProductModal({ productToEdit, onClose, /* db, userId, appId, */ onSave }) {
+  const [formData, setFormData] = useState(
+    productToEdit || { category: "Streaming" } // Default ou produto existente
+  );
+  const [selectedCategory, setSelectedCategory] = useState(
+    productToEdit?.category || "Streaming"
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [fieldsToRender, setFieldsToRender] = useState(
+    CATEGORY_DEFINITIONS[selectedCategory].fields
+  );
+
+  // Atualiza os campos do formulário quando a categoria muda
+  useEffect(() => {
+    const newFields = CATEGORY_DEFINITIONS[selectedCategory]?.fields || [];
+    setFieldsToRender(newFields);
+    
+    // Reseta o formData mantendo apenas os campos comuns + categoria
+    if (!productToEdit) {
+      setFormData({ category: selectedCategory });
+    } else if (productToEdit.category !== selectedCategory) {
+       // Se está editando e troca a categoria, limpa os campos específicos antigos
+       const commonData = {
+         id: productToEdit.id,
+         category: selectedCategory,
+         productName: productToEdit.productName,
+         supplier: productToEdit.supplier,
+       };
+       setFormData(commonData);
+    }
+
+  }, [selectedCategory, productToEdit]);
+
+  const handleChange = (e) => {
+    const { name, value, type } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'number' ? (value ? Number(value) : '') : value
+    }));
+  };
+
+  const handleCategoryChange = (e) => {
+    const newCategory = e.target.value;
+    setSelectedCategory(newCategory);
+    handleChange(e); // Atualiza a categoria no formData também
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    /* REMOVIDO
+    if (isSaving || !db || !userId) return;
+    
+    setIsSaving(true);
+    
+    try {
+      if (productToEdit) {
+        // Editando
+        const docPath = `/artifacts/${appId}/users/${userId}/products/${productToEdit.id}`;
+        await setDoc(doc(db, docPath), formData);
+      } else {
+        // Adicionando
+        const collectionPath = `/artifacts/${appId}/users/${userId}/products`;
+        await addDoc(collection(db, collectionPath), { ...formData, userId });
+      }
+      onClose();
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      // Aqui você setaria um estado de erro para o modal
+    } finally {
+      setIsSaving(false);
+    }
+    */
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      if (productToEdit) {
+        onSave({ ...formData, id: productToEdit.id });
+      } else {
+        onSave({ ...formData, id: crypto.randomUUID() });
+      }
+      onClose();
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Renderiza um campo do formulário com base na sua definição
+  const renderField = (fieldName) => {
+    const fieldDef = FIELD_LABELS[fieldName];
+    if (!fieldDef) {
+      console.warn("Definição não encontrada para o campo:", fieldName);
+      return null;
+    }
+    
+    const commonProps = {
+      id: fieldName,
+      name: fieldName,
+      value: formData[fieldName] || '',
+      onChange: handleChange,
+      className: "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 placeholder-gray-500",
+      placeholder: fieldDef.placeholder || '',
+    };
+    
+    return (
+      <div key={fieldName} className="col-span-1">
+        <label htmlFor={fieldName} className="block text-sm font-medium text-gray-300 mb-1">
+          {fieldDef.label}
+        </label>
+        {fieldDef.type === 'select' ? (
+          <select {...commonProps}>
+            <option value="">Selecione...</option>
+            {fieldDef.options.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        ) : (
+          <input 
+            type={fieldDef.type}
+            step={fieldDef.type === 'number' ? '0.01' : undefined}
+            {...commonProps} 
+          />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+      <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        {/* Cabeçalho do Modal */}
+        <div className="flex justify-between items-center p-6 border-b border-gray-700">
+          <h2 className="text-2xl font-bold text-white">
+            {productToEdit ? 'Editar Produto' : 'Adicionar Novo Produto'}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-gray-200">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        
+        {/* Formulário */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Seletor de Categoria (Sempre primeiro) */}
+            <div className="col-span-1 md:col-span-2">
+              <label htmlFor="category" className="block text-sm font-medium text-gray-300 mb-1">
+                Categoria do Produto
+              </label>
+              <select
+                id="category"
+                name="category"
+                value={selectedCategory}
+                onChange={handleCategoryChange}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 font-medium"
+              >
+                {Object.keys(CATEGORY_DEFINITIONS).map(key => (
+                  <option key={key} value={key}>{CATEGORY_DEFINITIONS[key].label}</option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Campos Dinâmicos */}
+            {fieldsToRender.map(fieldName => renderField(fieldName))}
+
+            {/* Campo especial 'addons' que só aparece se 'hasAddons' for 'Sim' */}
+            {selectedCategory === 'Streaming' && formData.hasAddons === 'Sim' && renderField('addons')}
+            
+          </div>
+        </form>
+
+        {/* Rodapé do Modal */}
+        <div className="flex justify-end items-center p-6 border-t bg-gray-800 border-gray-700 rounded-b-lg">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 mr-3"
+            disabled={isSaving}
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            onClick={handleSubmit} // Permite salvar clicando fora do form
+            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
+              isSaving ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Salvando...' : (productToEdit ? 'Salvar Alterações' : 'Adicionar Produto')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Funções Utilitárias ---
+
+/**
+ * Formata uma string de data (YYYY-MM-DD) para (DD/MM/YYYY)
+ */
+function formatDate(dateString) {
+  if (!dateString) return '-';
+  try {
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  } catch (e) {
+    return dateString; // Retorna original se falhar
+  }
+}
 
