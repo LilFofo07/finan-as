@@ -4,35 +4,12 @@
     <title>Gerenciador de Produtos e Finanças</title>
     <!-- Link para o Manifesto PWA (Removido para corrigir erro no preview) -->
     <!-- <link rel="manifest" href="manifest.json"> -->
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Configuração do Tailwind para o tema Amoled -->
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        // Fundo preto puro para Amoled
-                        black: '#000000',
-                        // Cores vibrantes
-                        primary: {
-                            DEFAULT: '#6366F1', // Indigo-500
-                            hover: '#4F46E5'  // Indigo-600
-                        },
-                        secondary: '#1F2937', // Gray-800
-                        tertiary: '#111827', // Gray-900
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                },
-            },
-        };
-    </script>
+    <!-- Scripts externos REMOVIDOS do <head> para não bloquear o carregamento offline -->
+    <!-- <script src="https://cdn.tailwindcss.com"></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
+    
+    <!-- Configuração do Tailwind MOVIDA para o final do <body> -->
     
     <!-- Estilos personalizados para a barra de rolagem e fundo -->
     <style>
@@ -270,7 +247,7 @@
     <!--        MODAIS        -->
     <!-- #################### -->
 
-    <!-- Modal de Alerta (Substitui alert()) -->
+    <!-- Modal de Alerta (Substitui alert()) - RE-ADICIONADO -->
     <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h3 class="text-xl font-semibold text-white mb-4" id="alert-modal-title">Aviso</h3>
@@ -283,7 +260,7 @@
         </div>
     </div>
 
-    <!-- Modal de Confirmação (Substitui confirm()) -->
+    <!-- Modal de Confirmação (Substitui confirm()) - RE-ADICIONADO -->
     <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
         <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
             <h3 class="text-xl font-semibold text-white mb-4" id="confirm-modal-title">Confirmar Ação</h3>
@@ -355,6 +332,40 @@
         </div>
     </div>
 
+
+    <!-- Configuração do Tailwind MOVIDA para cá (antes do script principal do Tailwind) -->
+    <script>
+        // Define o objeto 'tailwind' e sua propriedade 'config'
+        // Isso corrige o erro 'tailwind is not defined'
+        var tailwind = {
+            config: {
+                darkMode: 'class',
+                theme: {
+                    extend: {
+                        colors: {
+                            // Fundo preto puro para Amoled
+                            black: '#000000',
+                            // Cores vibrantes
+                            primary: {
+                                DEFAULT: '#6366F1', // Indigo-500
+                                hover: '#4F46E5'  // Indigo-600
+                            },
+                            secondary: '#1F2937', // Gray-800
+                            tertiary: '#111827', // Gray-900
+                        },
+                        fontFamily: {
+                            sans: ['Inter', 'sans-serif'],
+                        },
+                    },
+                },
+            }
+        };
+    </script>
+
+    <!-- SCRIPTS EXTERNOS MOVIDOS PARA O FIM DO BODY E MARCADOS COM 'defer' -->
+    <!-- Isso impede que eles bloqueiem a renderização e o script principal. -->
+    <script src="https://cdn.tailwindcss.com" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
     <!-- Script principal da aplicação (Offline) -->
     <script>
