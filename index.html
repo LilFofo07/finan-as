@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Produtos e Finanças</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Configuração do Tailwind para o tema Amoled -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Fundo preto puro para Amoled
+                        black: '#000000',
+                        // Cores vibrantes
+                        primary: {
+                            DEFAULT: '#6366F1', // Indigo-500
+                            hover: '#4F46E5'  // Indigo-600
+                        },
+                        secondary: '#1F2937', // Gray-800
+                        tertiary: '#111827', // Gray-900
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    
+    <!-- Estilos personalizados para a barra de rolagem e fundo -->
+    <style>
+        body {
+            background-color: #000000;
+            font-family: 'Inter', sans-serif;
+        }
+        /* Estilizando a barra de rolagem para o tema Amoled */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4F46E5; /* Cor primária */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6366F1; /* Cor primária hover */
+        }
+        /* Esconde o input de arquivo */
+        #import-file {
+            display: none;
+        }
+        /* Ajuste para o modal de edição não pular quando o scroll aparece */
+        #edit-product-modal.overflow-y-auto {
+            padding-right: 0 !important; 
+        }
+    </style>
+</head>
+<body class="bg-black text-gray-100 min-h-screen">
+
+    <!-- Container Principal -->
+    <div class="container mx-auto max-w-7xl p-4 md:p-8">
+
+        <!-- Cabeçalho -->
+        <header class="mb-6">
+            <h1 class="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-500">
+                Gerenciador
+            </h1>
+            <p class="text-gray-400">Seu painel de controle de produtos e finanças (Offline).</p>
+        </header>
+
+        <!-- Navegação -->
+        <nav class="mb-8 flex space-x-2 rounded-lg bg-tertiary p-2">
+            <button id="nav-products" class="nav-button flex-1 py-3 px-4 rounded-md font-medium text-sm transition-all duration-200">
+                Produtos
+            </button>
+            <button id="nav-finances" class="nav-button flex-1 py-3 px-4 rounded-md font-medium text-sm transition-all duration-200">
+                Finanças
+            </button>
+        </nav>
+        
+        <!-- Seção de Backup -->
+        <section id="backup-section" class="mb-8 bg-tertiary p-4 rounded-lg shadow-lg flex flex-col sm:flex-row gap-4">
+            <h2 class="text-lg font-semibold text-white mb-2 sm:mb-0">Backup (JSON):</h2>
+            <div class="flex-1 flex gap-4">
+                <button id="export-button" class="w-full sm:w-auto flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">
+                    Exportar Backup
+                </button>
+                <input type="file" id="import-file" accept=".json">
+                <button id="import-button" class="w-full sm:w-auto flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200">
+                    Importar Backup
+                </button>
+            </div>
+        </section>
+
+
+        <!-- Conteúdo Principal -->
+        <main id="main-content">
+
+            <!-- #################### -->
+            <!--   SEÇÃO DE PRODUTOS   -->
+            <!-- #################### -->
+            <section id="products-section">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    <!-- Coluna 1: Adicionar Produto -->
+                    <div class="lg:col-span-1 bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4 text-white">Adicionar Produto</h2>
+                        <form id="product-form" class="space-y-4">
+                            <div>
+                                <label for="product-name" class="block text-sm font-medium text-gray-300">Nome do Produto</label>
+                                <input type="text" id="product-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                            </div>
+                            
+                            <!-- Campos do Fornecedor Atualizados -->
+                            <fieldset class="border border-gray-700 rounded-md p-4 space-y-3">
+                                <legend class="px-2 text-sm font-medium text-gray-300">Dados do Fornecedor</legend>
+                                
+                                <div>
+                                    <label for="product-supplier-name" class="block text-sm font-medium text-gray-400">Nome do Fornecedor</label>
+                                    <input type="text" id="product-supplier-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+                                <div>
+                                    <label for="product-supplier-whatsapp" class="block text-sm font-medium text-gray-400">WhatsApp (ex: 5511988887777)</label>
+                                    <input type="text" id="product-supplier-whatsapp" placeholder="Apenas números com DDD" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+                                <div>
+                                    <label for="product-supplier-telegram" class="block text-sm font-medium text-gray-400">Telegram (ex: @usuario)</label>
+                                    <input type="text" id="product-supplier-telegram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+                                <div>
+                                    <label for="product-supplier-instagram" class="block text-sm font-medium text-gray-400">Instagram (ex: @usuario)</label>
+                                    <input type="text" id="product-supplier-instagram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+
+                            </fieldset>
+                            
+                            <!-- Campos de Preço -->
+                            <div class="flex gap-4">
+                                <div class="flex-1">
+                                    <label for="product-cost" class="block text-sm font-medium text-gray-300">Custo (R$)</label>
+                                    <input type="number" step="0.01" id="product-cost" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+                                <div class="flex-1">
+                                    <label for="product-sale-price" class="block text-sm font-medium text-gray-300">Venda (R$)</label>
+                                    <input type="number" step="0.01" id="product-sale-price" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg">
+                                Adicionar Produto
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Coluna 2: Lista de Produtos -->
+                    <div class="lg:col-span-2 bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4 text-white">Inventário de Produtos</h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-secondary">
+                                <thead class="bg-secondary">
+                                    <tr>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Produto</th>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Fornecedor</th>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Contato</th>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Custo</th>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Venda</th>
+                                        <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="product-list" class="divide-y divide-secondary">
+                                    <!-- Linhas de produtos serão inseridas aqui pelo JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- #################### -->
+            <!--   SEÇÃO DE FINANÇAS   -->
+            <!-- #################### -->
+            <section id="finances-section" class="hidden">
+                
+                <!-- Cards de Resumo -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h3 class="text-sm font-medium text-green-400">Total de Entradas</h3>
+                        <p id="total-entradas" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
+                    </div>
+                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h3 class="text-sm font-medium text-red-400">Total de Saídas</h3>
+                        <p id="total-saidas" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
+                    </div>
+                    <div class="bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h3 class="text-sm font-medium text-blue-400">Saldo Atual</h3>
+                        <p id="saldo-atual" class="mt-1 text-3xl font-semibold text-white">R$ 0,00</p>
+                    </div>
+                </div>
+
+                <!-- Gráfico e Transações -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Coluna 1: Gráfico -->
+                    <div class="lg:col-span-2 bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4 text-white">Visão Geral</h2>
+                        <div class="h-96">
+                            <canvas id="finance-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Coluna 2: Adicionar Transação -->
+                    <div class="lg:col-span-1 bg-tertiary p-6 rounded-lg shadow-lg">
+                        <h2 class="text-2xl font-semibold mb-4 text-white">Adicionar Transação</h2>
+                        <form id="transaction-form" class="space-y-4">
+                            <div>
+                                <label for="transaction-desc" class="block text-sm font-medium text-gray-300">Descrição</label>
+                                <input type="text" id="transaction-desc" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                            </div>
+                            <div>
+                                <label for="transaction-type" class="block text-sm font-medium text-gray-300">Tipo</label>
+                                <select id="transaction-type" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                                    <option value="entrada" class="bg-secondary text-green-400">Entrada</option>
+                                    <option value="saida" class="bg-secondary text-red-400">Saída</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="transaction-amount" class="block text-sm font-medium text-gray-300">Valor (R$)</label>
+                                <input type="number" step="0.01" id="transaction-amount" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                            </div>
+                            <button type="submit" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-md transition-all duration-200 shadow-lg">
+                                Adicionar Transação
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Lista de Transações Recentes -->
+                <div class="bg-tertiary p-6 rounded-lg shadow-lg mt-8">
+                    <h2 class="text-2xl font-semibold mb-4 text-white">Transações Recentes</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-secondary">
+                            <thead class="bg-secondary">
+                                <tr>
+                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Descrição</th>
+                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Tipo</th>
+                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Valor</th>
+                                    <th scope="col" class="py-3.5 px-4 text-left text-sm font-semibold text-gray-300">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaction-list" class="divide-y divide-secondary">
+                                <!-- Linhas de transações serão inseridas aqui pelo JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- #################### -->
+    <!--        MODAIS        -->
+    <!-- #################### -->
+
+    <!-- Modal de Alerta (Substitui alert()) -->
+    <div id="alert-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-xl font-semibold text-white mb-4" id="alert-modal-title">Aviso</h3>
+            <p class="text-gray-300 mb-6" id="alert-modal-message">Mensagem de alerta.</p>
+            <div class="flex justify-end">
+                <button id="alert-modal-ok" class="py-2 px-4 rounded-md bg-primary hover:bg-primary-hover text-white font-bold transition-all">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação (Substitui confirm()) -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-sm">
+            <h3 class="text-xl font-semibold text-white mb-4" id="confirm-modal-title">Confirmar Ação</h3>
+            <p class="text-gray-300 mb-6" id="confirm-modal-message">Tem certeza?</p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-modal-cancel" class="py-2 px-4 rounded-md bg-secondary hover:bg-gray-600 text-white font-medium transition-all">
+                    Cancelar
+                </button>
+                <button id="confirm-modal-confirm" class="py-2 px-4 rounded-md bg-red-600 hover:bg-red-700 text-white font-bold transition-all">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edição de Produto -->
+    <div id="edit-product-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50 overflow-y-auto">
+        <div class="bg-tertiary rounded-lg shadow-xl p-6 w-full max-w-lg my-8">
+            <h3 class="text-2xl font-semibold text-white mb-6">Editar Produto</h3>
+            <form id="edit-product-form" class="space-y-4">
+                <!-- ID do produto será armazenado aqui -->
+                <input type="hidden" id="edit-product-id">
+                
+                <div>
+                    <label for="edit-product-name" class="block text-sm font-medium text-gray-300">Nome do Produto</label>
+                    <input type="text" id="edit-product-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                </div>
+                
+                <fieldset class="border border-gray-700 rounded-md p-4 space-y-3">
+                    <legend class="px-2 text-sm font-medium text-gray-300">Dados do Fornecedor</legend>
+                    <div>
+                        <label for="edit-product-supplier-name" class="block text-sm font-medium text-gray-400">Nome do Fornecedor</label>
+                        <input type="text" id="edit-product-supplier-name" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="edit-product-supplier-whatsapp" class="block text-sm font-medium text-gray-400">WhatsApp</label>
+                        <input type="text" id="edit-product-supplier-whatsapp" placeholder="Apenas números com DDD" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="edit-product-supplier-telegram" class="block text-sm font-medium text-gray-400">Telegram</label>
+                        <input type="text" id="edit-product-supplier-telegram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                    <div>
+                        <label for="edit-product-supplier-instagram" class="block text-sm font-medium text-gray-400">Instagram</label>
+                        <input type="text" id="edit-product-supplier-instagram" placeholder="Nome de usuário" class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                </fieldset>
+                
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label for="edit-product-cost" class="block text-sm font-medium text-gray-300">Custo (R$)</label>
+                        <input type="number" step="0.01" id="edit-product-cost" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                    <div class="flex-1">
+                        <label for="edit-product-sale-price" class="block text-sm font-medium text-gray-300">Venda (R$)</label>
+                        <input type="number" step="0.01" id="edit-product-sale-price" required class="mt-1 block w-full bg-secondary border-gray-700 rounded-md shadow-sm text-white focus:ring-primary focus:border-primary">
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-4">
+                    <button type="button" id="edit-modal-cancel" class="py-2 px-4 rounded-md bg-secondary hover:bg-gray-600 text-white font-medium transition-all">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="py-2 px-4 rounded-md bg-primary hover:bg-primary-hover text-white font-bold transition-all">
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- Script principal da aplicação (Offline) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Chaves do LocalStorage
+            const PRODUCTS_KEY = 'gerenciador_products';
+            const TRANSACTIONS_KEY = 'gerenciador_transactions';
+
+            // Referências do DOM (App)
+            const navProducts = document.getElementById('nav-products');
+            const navFinances = document.getElementById('nav-finances');
+            const productsSection = document.getElementById('products-section');
+            const financesSection = document.getElementById('finances-section');
+            const productForm = document.getElementById('product-form');
+            const productList = document.getElementById('product-list');
+            const transactionForm = document.getElementById('transaction-form');
+            const transactionList = document.getElementById('transaction-list');
+            const totalEntradasEl = document.getElementById('total-entradas');
+            const totalSaidasEl = document.getElementById('total-saidas');
+            const saldoAtualEl = document.getElementById('saldo-atual');
+            const exportButton = document.getElementById('export-button');
+            const importButton = document.getElementById('import-button');
+            const importFileInput = document.getElementById('import-file');
+
+            // Referências do DOM (Modais)
+            const alertModal = document.getElementById('alert-modal');
+            const alertModalTitle = document.getElementById('alert-modal-title');
+            const alertModalMessage = document.getElementById('alert-modal-message');
+            const alertModalOk = document.getElementById('alert-modal-ok');
+
+            const confirmModal = document.getElementById('confirm-modal');
+            const confirmModalTitle = document.getElementById('confirm-modal-title');
+            const confirmModalMessage = document.getElementById('confirm-modal-message');
+            const confirmModalCancel = document.getElementById('confirm-modal-cancel');
+            const confirmModalConfirm = document.getElementById('confirm-modal-confirm');
+
+            const editProductModal = document.getElementById('edit-product-modal');
+            const editProductForm = document.getElementById('edit-product-form');
+            const editModalCancel = document.getElementById('edit-modal-cancel');
+            const editProductIdInput = document.getElementById('edit-product-id');
+
+            let chartInstance = null;
+
+            // --- LÓGICA DOS MODAIS ---
+
+            // Modal de Alerta (substitui alert())
+            function showAlert(title, message) {
+                alertModalTitle.textContent = title;
+                alertModalMessage.textContent = message;
+                alertModal.classList.remove('hidden');
+            }
+            alertModalOk.addEventListener('click', () => alertModal.classList.add('hidden'));
+
+            // Modal de Confirmação (substitui confirm())
+            let confirmCallback = null;
+            function openConfirmModal(title, message, confirmText = 'Confirmar', onConfirm) {
+                confirmModalTitle.textContent = title;
+                confirmModalMessage.textContent = message;
+                confirmModalConfirm.textContent = confirmText;
+                confirmCallback = onConfirm; // Armazena o callback
+
+                // Ajusta a cor do botão de confirmação
+                if (confirmText.toLowerCase() === 'excluir') {
+                    confirmModalConfirm.classList.remove('bg-primary', 'hover:bg-primary-hover', 'bg-blue-600', 'hover:bg-blue-700');
+                    confirmModalConfirm.classList.add('bg-red-600', 'hover:bg-red-700');
+                } else {
+                    confirmModalConfirm.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    confirmModalConfirm.classList.add('bg-primary', 'hover:bg-primary-hover');
+                }
+                
+                confirmModal.classList.remove('hidden');
+            }
+
+            function closeConfirmModal() {
+                confirmModal.classList.add('hidden');
+                confirmCallback = null;
+            }
+
+            confirmModalCancel.addEventListener('click', closeConfirmModal);
+            confirmModalConfirm.addEventListener('click', () => {
+                if (typeof confirmCallback === 'function') {
+                    confirmCallback();
+                }
+                closeConfirmModal();
+            });
+
+            // Modal de Edição de Produto
+            function openEditModal(productId) {
+                const products = getProducts();
+                const product = products.find(p => p.id === productId);
+                if (!product) {
+                    showAlert('Erro', 'Produto não encontrado.');
+                    return;
+                }
+                
+                // Preenche o formulário
+                editProductIdInput.value = product.id;
+                document.getElementById('edit-product-name').value = product.name;
+                document.getElementById('edit-product-supplier-name').value = product.supplier.name;
+                document.getElementById('edit-product-supplier-whatsapp').value = product.supplier.whatsapp || '';
+                document.getElementById('edit-product-supplier-telegram').value = product.supplier.telegram || '';
+                document.getElementById('edit-product-supplier-instagram').value = product.supplier.instagram || '';
+                document.getElementById('edit-product-cost').value = product.cost;
+                document.getElementById('edit-product-sale-price').value = product.salePrice;
+                
+                editProductModal.classList.remove('hidden');
+            }
+
+            function closeEditModal() {
+                editProductModal.classList.add('hidden');
+                editProductForm.reset();
+            }
+
+            editModalCancel.addEventListener('click', closeEditModal);
+
+            editProductForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const id = editProductIdInput.value;
+                const products = getProducts();
+                const productIndex = products.findIndex(p => p.id === id);
+
+                if (productIndex === -1) {
+                    showAlert('Erro', 'Não foi possível salvar as alterações. Produto não encontrado.');
+                    return;
+                }
+
+                // Atualiza o objeto do produto
+                products[productIndex] = {
+                    ...products[productIndex], // Mantém ID e createdAt
+                    name: document.getElementById('edit-product-name').value,
+                    supplier: {
+                        name: document.getElementById('edit-product-supplier-name').value,
+                        whatsapp: document.getElementById('edit-product-supplier-whatsapp').value,
+                        telegram: document.getElementById('edit-product-supplier-telegram').value,
+                        instagram: document.getElementById('edit-product-supplier-instagram').value
+                    },
+                    cost: parseFloat(document.getElementById('edit-product-cost').value),
+                    salePrice: parseFloat(document.getElementById('edit-product-sale-price').value)
+                };
+
+                saveProducts(products); // Salva o array atualizado
+                closeEditModal();
+                loadProducts(); // Recarrega a lista na UI
+                showAlert('Sucesso', 'Produto atualizado!');
+            });
+
+            // Função para formatar moeda
+            const formatCurrency = (value) => {
+                return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            };
+
+            // --- LÓGICA DE NAVEGAÇÃO ---
+            function showProducts() {
+                productsSection.classList.remove('hidden');
+                financesSection.classList.add('hidden');
+                navProducts.classList.add('bg-primary', 'text-white');
+                navFinances.classList.remove('bg-primary', 'text-white');
+                navFinances.classList.add('text-gray-400', 'hover:bg-secondary');
+            }
+
+            function showFinances() {
+                productsSection.classList.add('hidden');
+                financesSection.classList.remove('hidden');
+                navFinances.classList.add('bg-primary', 'text-white');
+                navProducts.classList.remove('bg-primary', 'text-white');
+                navProducts.classList.add('text-gray-400', 'hover:bg-secondary');
+            }
+
+            navProducts.addEventListener('click', showProducts);
+            navFinances.addEventListener('click', showFinances);
+
+            // --- LÓGICA DO GRÁFICO ---
+            function initChart() {
+                const ctx = document.getElementById('finance-chart').getContext('2d');
+                if (chartInstance) {
+                    chartInstance.destroy();
+                }
+                chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Entradas', 'Saídas'],
+                        datasets: [{
+                            label: 'Finanças',
+                            data: [0, 0],
+                            backgroundColor: ['#10B981', '#EF4444'],
+                            borderColor: '#000000',
+                            borderWidth: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#D1D5DB' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.label}: ${formatCurrency(context.raw)}`
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function updateChart(entradas, saidas) {
+                if (!chartInstance) initChart();
+                chartInstance.data.datasets[0].data = [entradas, saidas];
+                chartInstance.update();
+            }
+
+            // --- LÓGICA DE DADOS (LocalStorage) ---
+
+            // Funções de Leitura/Escrita
+            const getProducts = () => JSON.parse(localStorage.getItem(PRODUCTS_KEY)) || [];
+            const saveProducts = (products) => localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+            
+            const getTransactions = () => JSON.parse(localStorage.getItem(TRANSACTIONS_KEY)) || [];
+            const saveTransactions = (transactions) => localStorage.setItem(TRANSACTIONS_KEY, JSON.stringify(transactions));
+
+            // Atualiza toda a UI
+            function updateUI() {
+                loadProducts();
+                loadTransactions();
+            }
+
+            // --- LÓGICA DE PRODUTOS ---
+            productForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('product-name').value;
+                const cost = parseFloat(document.getElementById('product-cost').value);
+                const salePrice = parseFloat(document.getElementById('product-sale-price').value);
+
+                // Novos campos do fornecedor
+                const supplierName = document.getElementById('product-supplier-name').value;
+                const supplierWhatsapp = document.getElementById('product-supplier-whatsapp').value;
+                const supplierTelegram = document.getElementById('product-supplier-telegram').value;
+                const supplierInstagram = document.getElementById('product-supplier-instagram').value;
+
+
+                if (!name || !supplierName || isNaN(cost) || isNaN(salePrice)) return;
+
+                const products = getProducts();
+                const newProduct = {
+                    id: crypto.randomUUID(), // ID único
+                    name,
+                    supplier: { // Salva como objeto
+                        name: supplierName,
+                        whatsapp: supplierWhatsapp,
+                        telegram: supplierTelegram,
+                        instagram: supplierInstagram
+                    },
+                    cost,
+                    salePrice,
+                    createdAt: new Date().toISOString()
+                };
+                
+                products.push(newProduct);
+                saveProducts(products);
+                productForm.reset();
+                loadProducts(); // Apenas atualiza a lista de produtos
+            });
+
+            function loadProducts() {
+                let products = getProducts();
+                let needsSave = false;
+
+                // --- Migração de Dados ---
+                products.forEach(p => {
+                    if (p.supplier && typeof p.supplier === 'string') {
+                        p.supplier = {
+                            name: p.supplier,
+                            whatsapp: '',
+                            telegram: '',
+                            instagram: ''
+                        };
+                        needsSave = true;
+                    }
+                });
+
+                if (needsSave) {
+                    saveProducts(products);
+                }
+                // --- Fim da Migração ---
+
+
+                productList.innerHTML = '';
+                if (products.length === 0) {
+                    productList.innerHTML = '<tr><td colspan="6" class="py-4 px-4 text-center text-gray-500">Nenhum produto cadastrado.</td></tr>';
+                    return;
+                }
+                products.forEach(p => renderProductRow(p));
+            }
+
+            function renderProductRow(product) {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-secondary transition-colors";
+                
+                // Sanitização dos contatos
+                const whatsappNumber = (product.supplier.whatsapp || '').replace(/[\s()+-]/g, '');
+                const telegramUser = (product.supplier.telegram || '').replace('@', '');
+                const instagramUser = (product.supplier.instagram || '').replace('@', '');
+
+                // Cria os botões de contato
+                let contactButtons = '';
+                if (whatsappNumber) {
+                    contactButtons += `<a href="https://wa.me/${whatsappNumber}" target="_blank" class="inline-block bg-green-500 hover:bg-green-600 text-white text-xs font-bold py-1 px-2 rounded-md mr-1">WhatsApp</a>`;
+                }
+                if (telegramUser) {
+                    contactButtons += `<a href="https://t.me/${telegramUser}" target="_blank" class="inline-block bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-1 px-2 rounded-md mr-1">Telegram</a>`;
+                }
+                if (instagramUser) {
+                    contactButtons += `<a href="https://instagram.com/${instagramUser}" target="_blank" class="inline-block bg-pink-500 hover:bg-pink-600 text-white text-xs font-bold py-1 px-2 rounded-md">Instagram</a>`;
+                }
+                if (contactButtons === '') {
+                    contactButtons = '<span class="text-xs text-gray-500">N/A</span>';
+                }
+
+                tr.innerHTML = `
+                    <td class="py-4 px-4 text-sm font-medium text-white">${product.name}</td>
+                    <td class="py-4 px-4 text-sm text-gray-300">${product.supplier.name}</td>
+                    <td class="py-4 px-4 text-sm">${contactButtons}</td>
+                    <td class="py-4 px-4 text-sm text-red-400">${formatCurrency(product.cost)}</td>
+                    <td class="py-4 px-4 text-sm text-green-400">${formatCurrency(product.salePrice)}</td>
+                    <td class="py-4 px-4 text-sm">
+                        <button data-id="${product.id}" class="edit-product text-blue-400 hover:text-blue-300 font-medium p-1" title="Editar">
+                            <!-- Ícone de Edição (Lápis) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                        </button>
+                        <button data-id="${product.id}" class="delete-product text-red-500 hover:text-red-400 font-medium p-1" title="Excluir">
+                            <!-- Ícone de Exclusão (Lixeira) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </td>
+                `;
+                
+                // Listener para Excluir Produto
+                tr.querySelector('.delete-product').addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    openConfirmModal(
+                        'Excluir Produto',
+                        'Tem certeza que deseja excluir este produto?',
+                        'Excluir',
+                        () => {
+                            let products = getProducts();
+                            products = products.filter(p => p.id !== id);
+                            saveProducts(products);
+                            loadProducts(); // Recarrega a lista
+                        }
+                    );
+                });
+                
+                // Listener para Editar Produto
+                tr.querySelector('.edit-product').addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    openEditModal(id);
+                });
+                
+                productList.appendChild(tr);
+            }
+
+            // --- LÓGICA DE FINANÇAS ---
+            transactionForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const description = document.getElementById('transaction-desc').value;
+                const type = document.getElementById('transaction-type').value;
+                const amount = parseFloat(document.getElementById('transaction-amount').value);
+
+                if (!description || isNaN(amount) || amount <= 0) return;
+
+                const transactions = getTransactions();
+                const newTransaction = {
+                    id: crypto.randomUUID(),
+                    description,
+                    type,
+                    amount,
+                    createdAt: new Date().toISOString()
+                };
+
+                transactions.push(newTransaction);
+                saveTransactions(transactions);
+                transactionForm.reset();
+                loadTransactions(); // Apenas atualiza finanças
+            });
+
+            function loadTransactions() {
+                const transactions = getTransactions();
+                transactionList.innerHTML = '';
+                let totalEntradas = 0;
+                let totalSaidas = 0;
+
+                if (transactions.length === 0) {
+                    transactionList.innerHTML = '<tr><td colspan="4" class="py-4 px-4 text-center text-gray-500">Nenhuma transação registrada.</td></tr>';
+                } else {
+                    transactions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    transactions.forEach(t => {
+                        renderTransactionRow(t);
+                        if (t.type === 'entrada') {
+                            totalEntradas += t.amount;
+                        } else {
+                            totalSaidas += t.amount;
+                        }
+                    });
+                }
+                
+                const saldo = totalEntradas - totalSaidas;
+                totalEntradasEl.textContent = formatCurrency(totalEntradas);
+                totalSaidasEl.textContent = formatCurrency(totalSaidas);
+                saldoAtualEl.textContent = formatCurrency(saldo);
+                
+                updateChart(totalEntradas, totalSaidas);
+            }
+
+            function renderTransactionRow(transaction) {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-secondary transition-colors";
+                
+                const amountClass = transaction.type === 'entrada' ? 'text-green-400' : 'text-red-400';
+                const typeText = transaction.type === 'entrada' ? 'Entrada' : 'Saída';
+
+                tr.innerHTML = `
+                    <td class="py-4 px-4 text-sm font-medium text-white">${transaction.description}</td>
+                    <td class="py-4 px-4 text-sm ${amountClass}">${typeText}</td>
+                    <td class="py-4 px-4 text-sm font-medium ${amountClass}">${formatCurrency(transaction.amount)}</td>
+                    <td class="py-4 px-4 text-sm">
+                        <button data-id="${transaction.id}" class="delete-transaction text-red-500 hover:text-red-400 font-medium p-1" title="Excluir">
+                            <!-- Ícone de Exclusão (Lixeira) -->
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </td>
+                `;
+
+                tr.querySelector('.delete-transaction').addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    openConfirmModal(
+                        'Excluir Transação',
+                        'Tem certeza que deseja excluir esta transação?',
+                        'Excluir',
+                        () => {
+                            let transactions = getTransactions();
+                            transactions = transactions.filter(t => t.id !== id);
+                            saveTransactions(transactions);
+                            loadTransactions(); // Recarrega finanças
+                        }
+                    );
+                });
+
+                transactionList.appendChild(tr);
+            }
+
+            // --- LÓGICA DE BACKUP (JSON) ---
+            
+            // Exportar
+            exportButton.addEventListener('click', () => {
+                try {
+                    const data = {
+                        products: getProducts(),
+                        transactions: getTransactions()
+                    };
+                    
+                    const jsonData = JSON.stringify(data, null, 2);
+                    const blob = new Blob([jsonData], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `backup_gerenciador_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (error) {
+                    console.error("Erro ao exportar JSON:", error);
+                    showAlert('Erro de Exportação', 'Não foi possível gerar o arquivo de backup.');
+                }
+            });
+
+            // Importar (Botão que clica no input escondido)
+            importButton.addEventListener('click', () => {
+                importFileInput.click(); // Abre o seletor de arquivos
+            });
+
+            // Processar o arquivo selecionado
+            importFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data && Array.isArray(data.products) && Array.isArray(data.transactions)) {
+                            
+                            // Migração de dados na importação
+                            data.products.forEach(p => {
+                                if (p.supplier && typeof p.supplier === 'string') {
+                                    p.supplier = {
+                                        name: p.supplier,
+                                        whatsapp: '',
+                                        telegram: '',
+                                        instagram: ''
+                                    };
+                                }
+                            });
+                            
+                            openConfirmModal(
+                                'Importar Backup',
+                                'Isso irá sobrescrever todos os dados atuais. Deseja continuar?',
+                                'Importar',
+                                () => {
+                                    saveProducts(data.products);
+                                    saveTransactions(data.transactions);
+                                    updateUI(); // Atualiza toda a tela
+                                    showAlert('Sucesso', 'Backup importado com sucesso!');
+                                }
+                            );
+
+                        } else {
+                            showAlert('Erro de Importação', 'Arquivo de backup inválido ou mal formatado.');
+                        }
+                    } catch (error) {
+                        console.error("Erro ao importar JSON:", error);
+                        showAlert('Erro de Importação', 'Não foi possível ler o arquivo de backup.');
+                    } finally {
+                        importFileInput.value = '';
+                    }
+                };
+                reader.readAsText(file);
+            });
+
+            // --- INICIALIZAÇÃO DA APLICAÇÃO ---
+            initChart();
+            updateUI();
+            showProducts(); // Define a aba inicial
+
+        });
+    </script>
+
+</body>
+</html>
+
