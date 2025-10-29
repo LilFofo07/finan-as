@@ -1,9 +1,9 @@
-<!DOCTYPE html>
-<html lang="pt-br" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciador de Produtos e Finanças</title>
+    <!-- Link para o Manifesto PWA (Removido para corrigir erro no preview) -->
+    <!-- <link rel="manifest" href="manifest.json"> -->
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
@@ -528,6 +528,25 @@
 
             // --- LÓGICA DO GRÁFICO ---
             function initChart() {
+                // VERIFICAÇÃO OFFLINE: Só roda se o Chart.js carregou (Adicionado de volta)
+                if (typeof Chart === 'undefined') {
+                    console.warn('Chart.js não carregado. Gráfico desabilitado (modo offline?).');
+                    try {
+                        // Se estiver offline, exibe uma mensagem no canvas
+                        const canvas = document.getElementById('finance-chart');
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = '#4B5563'; // gray-600
+                        ctx.font = '16px Inter';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('Gráfico indisponível (offline)', canvas.width / 2, canvas.height / 2);
+                    } catch (e) {
+                        // ignora se o canvas não estiver pronto ou visível
+                    }
+                    return; // Aborta a função
+                }
+
+                // Se o Chart existe, continua
                 const ctx = document.getElementById('finance-chart').getContext('2d');
                 if (chartInstance) {
                     chartInstance.destroy();
@@ -563,7 +582,19 @@
             }
 
             function updateChart(entradas, saidas) {
+                // VERIFICAÇÃO OFFLINE: (Adicionado de volta)
+                if (typeof Chart === 'undefined') {
+                    return; // Aborta
+                }
+                
                 if (!chartInstance) initChart();
+                
+                // VERIFICAÇÃO Pós-init: (Adicionado de volta)
+                if (!chartInstance) {
+                    // Se o chartInstance ainda é nulo (init falhou)
+                    return; 
+                }
+
                 chartInstance.data.datasets[0].data = [entradas, saidas];
                 chartInstance.update();
             }
@@ -897,6 +928,22 @@
             initChart();
             updateUI();
             showProducts(); // Define a aba inicial
+
+            // --- REGISTRO DO SERVICE WORKER (PWA) ---
+            // Bloco removido para corrigir o erro no preview.
+            /*
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(registration => {
+                            console.log('Service Worker registrado com sucesso:', registration.scope);
+                        })
+                        .catch(error => {
+                            console.error('Falha ao registrar Service Worker:', error);
+                        });
+                });
+            }
+            */
 
         });
     </script>
