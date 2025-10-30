@@ -1,981 +1,1123 @@
-import React, { useState, useEffect, useMemo } from 'react';
-/* REMOVIDO
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  doc, 
-  setDoc, 
-  deleteDoc,
-  setLogLevel
-} from 'firebase/firestore';
-*/
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
-} from 'recharts';
-import { 
-  LayoutDashboard, 
-  Package, 
-  PlusCircle, 
-  ChevronDown, 
-  Search, 
-  Edit2, 
-  Trash2, 
-  X,
-  AlertCircle,
-  TrendingUp,
-  DollarSign,
-  Users
-} from 'lucide-react';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, doc, onSnapshot, collection, query, addDoc, setDoc, deleteDoc, writeBatch, runTransaction, getDoc, updateDoc } from 'firebase/firestore';
+import { setLogLevel } from 'firebase/firestore';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { LayoutDashboard, ListTodo, Plus, Trash2, Search, ArrowUp, ArrowDown, LogOut, Loader2, DollarSign, Package, Clock, Calendar, ExternalLink } from 'lucide-react';
 
-// --- Constantes de Configuração ---
+// Ativar logs do Firestore para depuração
+setLogLevel('debug');
 
-// Configuração das categorias e seus campos específicos
-// Isso é o coração da lógica dinâmica do formulário
-const CATEGORY_DEFINITIONS = {
-  "Streaming": {
-    label: "Streaming (100 un)",
-    fields: ["productName", "supplier", "accountPrice", "screenPrice", "purchasePrice", "salePrice", "duration", "purchaseDate", "expirationDate", "hasAddons", "addons"]
-  },
-  "Música & Podcast": {
-    label: "Música & Podcast (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Aprendizado de Idiomas": {
-    label: "Aprendizado de Idiomas (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Cursos Online": {
-    label: "Cursos Online (50 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Preparação para Provas e Vestibulares": {
-    label: "Preparação para Provas e Vestibulares (50 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Métodos Diversos": {
-    label: "Métodos Diversos (10 un)",
-    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate"]
-  },
-  "Recarga de Celular": {
-    label: "Recarga de Celular (20 un)",
-    fields: ["productName", "supplier", "price", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Livros & Audiobooks": {
-    label: "Livros & Audiobooks (20 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Edição de Vídeo & Imagem": {
-    label: "Edição de Vídeo & Imagem (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "TV Online": {
-    label: "TV Online (10 un)",
-    fields: ["productName", "supplier", "login", "accountPrice", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Seguidores, Curtidas & Visualizações": {
-    label: "Seguidores, Curtidas & Visualizações (3 un)",
-    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "socialNetwork"]
-  },
-  "Inteligência Artificial": {
-    label: "Inteligência Artificial (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Jogos": {
-    label: "Jogos (100 un)",
-    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate", "saleDate"]
-  },
-  "Bots de Número Virtual": {
-    label: "Bots de Número Virtual (40 un)",
-    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate", "saleDate"]
-  },
-  "Planilhas": {
-    label: "Planilhas (10 un)",
-    fields: ["productName", "supplier", "purchasePrice", "salePrice", "purchaseDate"]
-  },
-  "Conteúdo Adulto": {
-    label: "Conteúdo Adulto (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Conteúdo Religioso": {
-    label: "Conteúdo Religioso (10 un)",
-    fields: ["productName", "supplier", "accountPrice", "access", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Softwares & Licenças": {
-    label: "Softwares & Licenças (20 un)",
-    fields: ["productName", "supplier", "duration", "purchasePrice", "purchaseDate", "salePrice", "saleDate", "expirationDate"]
-  },
-  "Aplicativos Modificados": {
-    label: "Aplicativos Modificados (100 un)",
-    fields: ["productName", "supplier", "purchasePrice", "purchaseDate", "salePrice", "saleDate"]
-  }
+// Variáveis globais fornecidas pelo ambiente
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// Configuração das Categorias e seus Campos
+const CATEGORY_CONFIG = {
+    'Streaming': {
+        limit: 100,
+        fields: ['accountValue', 'accessValue', 'hasAddons', 'addOnDetails', 'duration', 'expirationDate'],
+        labels: { accountValue: 'Conta', accessValue: 'Tela', hasAddons: 'Possui Add-ons?', addOnDetails: 'Lista/Qtd de Add-ons' }
+    },
+    'Música & Podcast': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Aprendizado de Idiomas': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Cursos Online': { limit: 50, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Preparação para Provas e Vestibulares': { limit: 50, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Métodos Diversos': { limit: 10, fields: ['saleDate'] },
+    'Recarga de Celular': { limit: 20, fields: ['priceValue', 'duration', 'saleDate', 'expirationDate'], labels: { priceValue: 'Valor da Recarga' } },
+    'Livros & Audiobooks': { limit: 20, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Edição de Vídeo & Imagem': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'TV Online': { limit: 10, fields: ['login', 'accountValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', login: 'Login' } },
+    'Seguidores, Curtidas & Visualizações': { limit: 3, fields: ['socialMedia', 'saleDate'], labels: { socialMedia: 'Rede Social' } },
+    'Inteligência Artificial': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Jogos': { limit: 100, fields: ['saleDate'] },
+    'Bots de Número Virtual': { limit: 40, fields: ['saleDate'] },
+    'Planilhas': { limit: 10, fields: [] },
+    'Conteúdo Adulto': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Conteúdo Religioso': { limit: 10, fields: ['accountValue', 'accessValue', 'duration', 'saleDate', 'expirationDate'], labels: { accountValue: 'Conta', accessValue: 'Acesso' } },
+    'Softwares & Licenças': { limit: 20, fields: ['duration', 'saleDate', 'expirationDate'] },
+    'Aplicativos Modificados': { limit: 100, fields: ['saleDate'] }
 };
 
-// Definição de todos os campos possíveis e seus rótulos em português
-const FIELD_LABELS = {
-  productName: { label: "Produto", type: "text", placeholder: "Nome do produto/serviço" },
-  supplier: { label: "Fornecedor", type: "text", placeholder: "WhatsApp, Telegram ou site" },
-  accountPrice: { label: "Preço (Conta)", type: "number", placeholder: "Valor da conta" },
-  screenPrice: { label: "Preço (Tela)", type: "number", placeholder: "Valor da tela" },
-  access: { label: "Acesso", type: "text", placeholder: "Link, usuário, etc." },
-  login: { label: "Login", type: "text", placeholder: "Usuário/Senha" },
-  price: { label: "Preço", type: "number", placeholder: "Preço do item" },
-  purchasePrice: { label: "Preço de Compra", type: "number", placeholder: "0.00" },
-  salePrice: { label: "Preço de Venda", type: "number", placeholder: "0.00" },
-  duration: { label: "Duração", type: "text", placeholder: "30 dias, 1 ano..." },
-  purchaseDate: { label: "Data de Compra", type: "date" },
-  saleDate: { label: "Data de Venda", type: "date" },
-  expirationDate: { label: "Data de Expiração", type: "date" },
-  hasAddons: { label: "Possui Add-ons?", type: "select", options: ["Não", "Sim"] },
-  addons: { label: "Lista/Qtde Add-ons", type: "text", placeholder: "Prime, Max ou 3" },
-  socialNetwork: { label: "Rede Social", type: "select", options: ["Instagram", "TikTok", "Twitter", "YouTube", "WhatsApp", "Telegram"] }
+const ALL_CATEGORIES = Object.keys(CATEGORY_CONFIG).sort();
+
+// Opções de Fornecedor
+const SUPPLIER_OPTIONS = ['WhatsApp', 'Telegram Bot', 'Site'];
+
+// Funções utilitárias
+const formatCurrency = (value) => {
+    if (typeof value !== 'number' || isNaN(value)) return 'R$ 0,00';
+    return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-const PIE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF00FF', '#00FFFF', '#FF0000', '#00FF00', '#0000FF'];
-
-// --- Componentes da UI ---
-
-/**
- * Componente Principal - App
- * Gerencia o estado global, autenticação e navegação.
- */
-export default function App() {
-  const [page, setPage] = useState('dashboard'); // 'dashboard' ou 'products'
-  /* REMOVIDO
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-  */
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  /* REMOVIDO
-  const [appId, setAppId] = useState('default-app-id');
-  */
-
-  /* REMOVIDO 
-  // 1. Inicialização do Firebase e Autenticação
-  useEffect(() => {
+const formatDate = (dateString) => {
+    if (!dateString) return '-';
     try {
-      // Pega o App ID e a Config do Firebase do ambiente
-      const appIdFromEnv = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-      const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
-      const firebaseConfig = JSON.parse(firebaseConfigStr);
-
-      if (!firebaseConfig.apiKey) {
-        setError("Configuração do Firebase não encontrada.");
-        setLoading(false);
-        return;
-      }
-      
-      setAppId(appIdFromEnv);
-
-      const app = initializeApp(firebaseConfig);
-      const authInstance = getAuth(app);
-      const dbInstance = getFirestore(app);
-      
-      // Habilita logs de debug do Firestore
-      // setLogLevel('debug');
-
-      setDb(dbInstance);
-      setAuth(authInstance);
-
-      // Listener de autenticação
-      const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-          setIsAuthReady(true);
-        } else {
-          // Tenta logar com token customizado ou anonimamente
-          try {
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            if (token) {
-              await signInWithCustomToken(authInstance, token);
-            } else {
-              await signInAnonymously(authInstance);
-            }
-          } catch (authError) {
-            console.error("Erro na autenticação:", authError);
-            setError("Falha ao autenticar. Verifique a configuração do Firebase.");
-            setLoading(false);
-          }
-        }
-      });
-
-      return () => unsubscribe();
-    } catch (e) {
-      console.error("Erro ao inicializar Firebase:", e);
-      setError("Erro crítico ao carregar o app. Verifique o console.");
-      setLoading(false);
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR');
+    } catch {
+        return dateString;
     }
-  }, []);
+};
 
-  // 2. Carregamento de Dados do Firestore
-  useEffect(() => {
-    if (!isAuthReady || !db || !userId) {
-      return;
-    }
-
-    setLoading(true);
-    
-    // Caminho da coleção privada do usuário
-    const collectionPath = `/artifacts/${appId}/users/${userId}/products`;
-    const q = query(collection(db, collectionPath));
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const productsData = [];
-      querySnapshot.forEach((doc) => {
-        productsData.push({ id: doc.id, ...doc.data() });
-      });
-      setProducts(productsData);
-      setLoading(false);
-    }, (err) => {
-      console.error("Erro ao buscar dados:", err);
-      setError("Não foi possível carregar os produtos. Verifique sua conexão e as regras do Firestore.");
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [isAuthReady, db, userId, appId]);
-  */
-
-  // 1. Carrega os produtos do localStorage ao iniciar
-  useEffect(() => {
-    setLoading(true);
+const daysUntil = (dateString) => {
+    if (!dateString) return null;
     try {
-      const savedProducts = localStorage.getItem('gestorDigitalProdutos');
-      if (savedProducts) {
-        setProducts(JSON.parse(savedProducts));
-      }
-    } catch (e) {
-      console.error("Erro ao carregar produtos do localStorage:", e);
-      setError("Não foi possível carregar seus dados salvos.");
+        const date = new Date(dateString);
+        const today = new Date();
+        const diffTime = date.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    } catch {
+        return null;
     }
-    setLoading(false);
-  }, []);
+};
 
-  // 2. Salva os produtos no localStorage sempre que a lista for alterada
-  useEffect(() => {
-    try {
-      localStorage.setItem('gestorDigitalProdutos', JSON.stringify(products));
-    } catch (e) {
-      console.error("Erro ao salvar produtos no localStorage:", e);
-      setError("Não foi possível salvar suas alterações.");
-    }
-  }, [products]);
-
-  // Funções CRUD para manipular o estado
-  const saveProduct = (productData) => {
-    setProducts(prevProducts => {
-      const existing = prevProducts.find(p => p.id === productData.id);
-      if (existing) {
-        // Editar
-        return prevProducts.map(p =>
-          p.id === productData.id ? productData : p
-        );
-      } else {
-        // Adicionar
-        return [...prevProducts, productData];
-      }
-    });
-  };
-
-  const deleteProduct = (productId) => {
-    setProducts(prevProducts =>
-      prevProducts.filter(p => p.id !== productId)
-    );
-  };
-
-  // Renderização principal
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-black">
-        <div className="p-6 bg-gray-900 rounded-lg shadow-md text-center">
-          <AlertCircle className="w-12 h-12 mx-auto text-red-500" />
-          <h2 className="mt-4 text-xl font-semibold text-white">Erro ao Carregar</h2>
-          <p className="mt-2 text-gray-300">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  /* REMOVIDO
-  if (loading && !isAuthReady) {
-  */
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-black text-white">
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-lg">Carregando dados...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-screen bg-black font-inter">
-      {/* Sidebar */}
-      <nav className="w-64 bg-black text-white flex flex-col">
-        <div className="p-6 text-2xl font-bold border-b border-gray-800">
-          Gestor Digital
-        </div>
-        <ul className="flex-1 mt-6 space-y-2">
-          <NavItem
-            icon={<LayoutDashboard />}
-            label="Dashboard"
-            isActive={page === 'dashboard'}
-            onClick={() => setPage('dashboard')}
-          />
-          <NavItem
-            icon={<Package />}
-            label="Gerenciar Produtos"
-            isActive={page === 'products'}
-            onClick={() => setPage('products')}
-          />
-        </ul>
-        <div className="p-4 border-t border-gray-800 text-xs text-gray-500">
-          {/* REMOVIDO
-          <p>App ID: {appId.substring(0, 15)}...</p>
-          <p>User ID: {userId ? userId.substring(0, 15) + '...' : 'N/A'}</p>
-          */}
-          <p>Status: Salvo localmente</p>
-        </div>
-      </nav>
-
-      {/* Conteúdo Principal */}
-      <main className="flex-1 overflow-y-auto p-8 text-white">
-        {page === 'dashboard' && <Dashboard products={products} />}
-        {page === 'products' && (
-          <ProductManager 
-            products={products}
-            loading={loading}
-            /* REMOVIDO
-            db={db}
-            userId={userId}
-            appId={appId} 
-            */
-            onSaveProduct={saveProduct}
-            onDeleteProduct={deleteProduct}
-          />
-        )}
-      </main>
-    </div>
-  );
-}
-
-/**
- * Componente NavItem (Item da Sidebar)
- */
-function NavItem({ icon, label, isActive, onClick }) {
-  return (
-    <li>
-      <button
-        onClick={onClick}
-        className={`flex items-center w-full px-6 py-3 text-left transition-colors duration-200 ${
-          isActive
-            ? 'bg-blue-600 text-white'
-            : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-        }`}
-      >
-        {React.cloneElement(icon, { className: 'w-5 h-5 mr-3' })}
-        <span className="font-medium">{label}</span>
-      </button>
-    </li>
-  );
-}
-
-/**
- * Componente Dashboard
- * Exibe gráficos e estatísticas.
- */
-function Dashboard({ products }) {
-  
-  // Memoiza os dados dos gráficos para evitar recálculos
-  const { kpiData, categoryData, salesData, expiringSoon } = useMemo(() => {
-    const totalPurchase = products.reduce((sum, p) => sum + (Number(p.purchasePrice) || 0), 0);
-    const totalSale = products.reduce((sum, p) => sum + (Number(p.salePrice) || 0), 0);
-    const potentialProfit = totalSale - totalPurchase;
+// Função para formatar o contato do fornecedor como link clicável
+const formatSupplierContact = (contact) => {
+    if (!contact) return '-';
     
-    const kpiData = [
-      { title: "Total de Produtos", value: products.length, icon: <Package className="w-6 h-6 text-blue-500" /> },
-      { title: "Valor Venda (Total)", value: `R$ ${totalSale.toFixed(2)}`, icon: <DollarSign className="w-6 h-6 text-green-500" /> },
-      { title: "Lucro Potencial", value: `R$ ${potentialProfit.toFixed(2)}`, icon: <TrendingUp className="w-6 h-6 text-yellow-500" /> },
-    ];
-    
-    const categoryCounts = products.reduce((acc, p) => {
-      const categoryName = p.category || "Sem Categoria";
-      acc[categoryName] = (acc[categoryName] || 0) + 1;
-      return acc;
-    }, {});
-    
-    const categoryData = Object.keys(categoryCounts).map(name => ({
-      name: CATEGORY_DEFINITIONS[name]?.label || name,
-      value: categoryCounts[name]
-    }));
-
-    const salesByCategory = products.reduce((acc, p) => {
-      const categoryName = p.category || "Sem Categoria";
-      const salePrice = Number(p.salePrice) || 0;
-      acc[categoryName] = (acc[categoryName] || 0) + salePrice;
-      return acc;
-    }, {});
-
-    const salesData = Object.keys(salesByCategory).map(name => ({
-      name: CATEGORY_DEFINITIONS[name]?.label.split(' ')[0] || name, // Nome curto
-      "Valor de Venda": salesByCategory[name]
-    }));
-    
-    const today = new Date();
-    const next7Days = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-    
-    const expiringSoon = products
-      .filter(p => {
-        if (!p.expirationDate) return false;
-        try {
-          const expDate = new Date(p.expirationDate + "T00:00:00"); // Adiciona T00:00:00 para datas locais
-          return expDate >= today && expDate <= next7Days;
-        } catch (e) {
-          return false;
-        }
-      })
-      .sort((a, b) => new Date(a.expirationDate) - new Date(b.expirationDate));
-
-    return { kpiData, categoryData, salesData, expiringSoon };
-  }, [products]);
-
-  return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-gray-100">Dashboard</h1>
-      
-      {/* KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {kpiData.map(item => (
-          <div key={item.title} className="p-6 bg-gray-900 rounded-lg shadow-lg flex items-center space-x-4">
-            <div className="p-3 bg-gray-800 rounded-full">{item.icon}</div>
-            <div>
-              <p className="text-sm font-medium text-gray-400">{item.title}</p>
-              <p className="text-2xl font-bold text-white">{item.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold text-white mb-4">Produtos por Categoria</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={categoryData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="50%"
-                outerRadius={110}
-                fill="#8884d8"
-                labelLine={false}
-                label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-              >
-                {categoryData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value) => [value, "Produtos"]} 
-                contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#d1d5db' }}
-              />
-              <Legend wrapperStyle={{ color: '#9ca3af' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
-          <h2 className="text-xl font-semibold text-white mb-4">Valor de Venda por Categoria</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={salesData} margin={{ top: 5, right: 0, left: 0, bottom: 5 }}>
-              <XAxis dataKey="name" fontSize={10} tick={{ fill: '#9ca3af' }} />
-              <YAxis tick={{ fill: '#9ca3af' }} />
-              <Tooltip 
-                formatter={(value) => [`R$ ${value.toFixed(2)}`, "Valor de Venda"]} 
-                contentStyle={{ backgroundColor: '#111827', border: 'none', borderRadius: '8px' }}
-                itemStyle={{ color: '#d1d5db' }}
-              />
-              <Legend wrapperStyle={{ color: '#9ca3af' }} />
-              <Bar dataKey="Valor de Venda" fill="#00C49F" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Tabela de Itens Expirando */}
-      <div className="p-6 bg-gray-900 rounded-lg shadow-lg">
-        <h2 className="text-xl font-semibold text-white mb-4">Itens Expirando em Breve (Próximos 7 dias)</h2>
-        {expiringSoon.length === 0 ? (
-          <p className="text-gray-400">Nenhum item expirando nos próximos 7 dias.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-800">
-                  <th className="p-3 text-sm font-semibold text-gray-300">Produto</th>
-                  <th className="p-3 text-sm font-semibold text-gray-300">Categoria</th>
-                  <th className="p-3 text-sm font-semibold text-gray-300">Data de Expiração</th>
-                  <th className="p-3 text-sm font-semibold text-gray-300">Preço Venda</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {expiringSoon.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-800">
-                    <td className="p-3 text-sm text-gray-200">{p.productName}</td>
-                    <td className="p-3 text-sm text-gray-200">{CATEGORY_DEFINITIONS[p.category]?.label || p.category}</td>
-                    <td className="p-3 text-sm text-red-400 font-medium">{formatDate(p.expirationDate)}</td>
-                    <td className="p-3 text-sm text-gray-200">R$ {Number(p.salePrice || 0).toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Componente ProductManager
- * Gerencia a lista, filtros e modal de adição/edição.
- */
-function ProductManager({ products, loading, /* db, userId, appId, */ onSaveProduct, onDeleteProduct }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Memoiza a lista de produtos filtrados
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const categoryMatch = filterCategory === 'all' || p.category === filterCategory;
-      const searchMatch = !searchTerm || 
-        (p.productName && p.productName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (p.supplier && p.supplier.toLowerCase().includes(searchTerm.toLowerCase()));
-      return categoryMatch && searchMatch;
-    });
-  }, [products, filterCategory, searchTerm]);
-
-  const handleAddNew = () => {
-    setEditingProduct(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEdit = (product) => {
-    setEditingProduct(product);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (productId) => {
-    // Substitui o confirm() por uma lógica de UI (a ser implementada, por ex. um 2º modal)
-    // Por enquanto, apenas executa a deleção.
-    /* REMOVIDO
-    if (!db || !userId) return;
-    try {
-      const docPath = `/artifacts/${appId}/users/${userId}/products/${productId}`;
-      await deleteDoc(doc(db, docPath));
-    } catch (e) {
-      console.error("Erro ao deletar produto:", e);
-      // Aqui você poderia setar um estado de erro para o usuário
-    }
-    */
-    // Apenas chama a função passada por props
-    onDeleteProduct(productId);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-100">Gerenciar Produtos</h1>
-        <button
-          onClick={handleAddNew}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-        >
-          <PlusCircle className="w-5 h-5 mr-2" />
-          Adicionar Produto
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="p-4 bg-gray-900 rounded-lg shadow-md flex items-center space-x-4">
-        <div className="flex-1 relative">
-          <input
-            type="text"
-            placeholder="Buscar por nome ou fornecedor..."
-            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 placeholder-gray-500"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-        </div>
-        <div className="relative">
-          <select
-            className="appearance-none w-64 bg-gray-800 text-white border-gray-700 border rounded-lg pl-4 pr-10 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            <option value="all">Todas as Categorias</option>
-            {Object.keys(CATEGORY_DEFINITIONS).map(key => (
-              <option key={key} value={key}>{CATEGORY_DEFINITIONS[key].label}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-5 h-5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-      </div>
-
-      {/* Tabela de Produtos */}
-      <DynamicProductTable 
-        products={filteredProducts}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
-
-      {/* Modal */}
-      {isModalOpen && (
-        <ProductModal
-          productToEdit={editingProduct}
-          onClose={() => setIsModalOpen(false)}
-          /* REMOVIDO
-          db={db}
-          userId={userId}
-          appId={appId}
-          */
-          onSave={onSaveProduct}
-        />
-      )}
-    </div>
-  );
-}
-
-/**
- * Componente DynamicProductTable
- * Exibe a tabela de produtos, adaptando colunas se necessário (simplificado por agora).
- */
-function DynamicProductTable({ products, loading, onEdit, onDelete }) {
-  
-  // Colunas comuns a serem exibidas
-  const columns = [
-    { key: "productName", label: "Produto" },
-    { key: "category", label: "Categoria" },
-    { key: "supplier", label: "Fornecedor" },
-    { key: "purchasePrice", label: "Preço Compra" },
-    { key: "salePrice", label: "Preço Venda" },
-    { key: "expirationDate", label: "Expiração" },
-  ];
-
-  const formatCell = (product, colKey) => {
-    const value = product[colKey];
-    switch(colKey) {
-      case 'category':
-        return CATEGORY_DEFINITIONS[value]?.label.split(' (')[0] || value || '-';
-      case 'purchasePrice':
-      case 'salePrice':
-        return `R$ ${Number(value || 0).toFixed(2)}`;
-      case 'expirationDate':
-        return value ? formatDate(value) : '-';
-      default:
-        return value || '-';
-    }
-  };
-
-  return (
-    <div className="bg-gray-900 rounded-lg shadow-lg overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-gray-800">
-            <tr>
-              {columns.map(col => (
-                <th key={col.key} className="p-4 text-sm font-semibold text-gray-300 uppercase">
-                  {col.label}
-                </th>
-              ))}
-              <th className="p-4 text-sm font-semibold text-gray-300 uppercase text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700">
-            {loading ? (
-              <tr>
-                <td colSpan={columns.length + 1} className="p-4 text-center text-gray-400">
-                  Carregando produtos...
-                </td>
-              </tr>
-            ) : products.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length + 1} className="p-4 text-center text-gray-400">
-                  Nenhum produto encontrado.
-                </td>
-              </tr>
-            ) : (
-              products.map(product => (
-                <tr key={product.id} className="hover:bg-gray-800">
-                  {columns.map(col => (
-                    <td key={col.key} className="p-4 text-sm text-gray-200 whitespace-nowrap">
-                      {formatCell(product, col.key)}
-                    </td>
-                  ))}
-                  <td className="p-4 text-sm text-gray-200 whitespace-nowrap text-right">
-                    <button onClick={() => onEdit(product)} className="text-blue-400 hover:text-blue-300 mr-3 p-1">
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                    <button onClick={() => onDelete(product.id)} className="text-red-400 hover:text-red-300 p-1">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Componente ProductModal
- * Formulário dinâmico para adicionar ou editar produtos.
- */
-function ProductModal({ productToEdit, onClose, /* db, userId, appId, */ onSave }) {
-  const [formData, setFormData] = useState(
-    productToEdit || { category: "Streaming" } // Default ou produto existente
-  );
-  const [selectedCategory, setSelectedCategory] = useState(
-    productToEdit?.category || "Streaming"
-  );
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const [fieldsToRender, setFieldsToRender] = useState(
-    CATEGORY_DEFINITIONS[selectedCategory].fields
-  );
-
-  // Atualiza os campos do formulário quando a categoria muda
-  useEffect(() => {
-    const newFields = CATEGORY_DEFINITIONS[selectedCategory]?.fields || [];
-    setFieldsToRender(newFields);
-    
-    // Reseta o formData mantendo apenas os campos comuns + categoria
-    if (!productToEdit) {
-      setFormData({ category: selectedCategory });
-    } else if (productToEdit.category !== selectedCategory) {
-       // Se está editando e troca a categoria, limpa os campos específicos antigos
-       const commonData = {
-         id: productToEdit.id,
-         category: selectedCategory,
-         productName: productToEdit.productName,
-         supplier: productToEdit.supplier,
-       };
-       setFormData(commonData);
-    }
-
-  }, [selectedCategory, productToEdit]);
-
-  const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'number' ? (value ? Number(value) : '') : value
-    }));
-  };
-
-  const handleCategoryChange = (e) => {
-    const newCategory = e.target.value;
-    setSelectedCategory(newCategory);
-    handleChange(e); // Atualiza a categoria no formData também
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    /* REMOVIDO
-    if (isSaving || !db || !userId) return;
-    
-    setIsSaving(true);
-    
-    try {
-      if (productToEdit) {
-        // Editando
-        const docPath = `/artifacts/${appId}/users/${userId}/products/${productToEdit.id}`;
-        await setDoc(doc(db, docPath), formData);
-      } else {
-        // Adicionando
-        const collectionPath = `/artifacts/${appId}/users/${userId}/products`;
-        await addDoc(collection(db, collectionPath), { ...formData, userId });
-      }
-      onClose();
-    } catch (error) {
-      console.error("Erro ao salvar produto:", error);
-      // Aqui você setaria um estado de erro para o modal
-    } finally {
-      setIsSaving(false);
-    }
-    */
-    if (isSaving) return;
-    setIsSaving(true);
-
-    try {
-      if (productToEdit) {
-        onSave({ ...formData, id: productToEdit.id });
-      } else {
-        onSave({ ...formData, id: crypto.randomUUID() });
-      }
-      onClose();
-    } catch (error) {
-      console.error("Erro ao salvar produto:", error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
-  // Renderiza um campo do formulário com base na sua definição
-  const renderField = (fieldName) => {
-    const fieldDef = FIELD_LABELS[fieldName];
-    if (!fieldDef) {
-      console.warn("Definição não encontrada para o campo:", fieldName);
-      return null;
+    // Verifica se é um número de telefone (WhatsApp)
+    const phoneRegex = /^(\+?\d{1,3})?[-.\s]?\(?\d{1,3}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}$/;
+    if (phoneRegex.test(contact)) {
+        const phoneNumber = contact.replace(/\D/g, '');
+        return {
+            text: contact,
+            url: `https://wa.me/${phoneNumber}`,
+            type: 'whatsapp'
+        };
     }
     
-    const commonProps = {
-      id: fieldName,
-      name: fieldName,
-      value: formData[fieldName] || '',
-      onChange: handleChange,
-      className: "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 placeholder-gray-500",
-      placeholder: fieldDef.placeholder || '',
+    // Verifica se é um link do WhatsApp
+    if (contact.includes('wa.me/') || contact.includes('api.whatsapp.com/send')) {
+        return {
+            text: contact,
+            url: contact,
+            type: 'whatsapp'
+        };
+    }
+    
+    // Verifica se é um link do Telegram
+    if (contact.includes('t.me/')) {
+        return {
+            text: contact,
+            url: contact,
+            type: 'telegram'
+        };
+    }
+    
+    // Verifica se é um username do Telegram (@username)
+    if (contact.startsWith('@')) {
+        return {
+            text: contact,
+            url: `https://t.me/${contact.substring(1)}`,
+            type: 'telegram'
+        };
+    }
+    
+    // Verifica se é um link do Instagram
+    if (contact.includes('instagram.com/')) {
+        return {
+            text: contact,
+            url: contact,
+            type: 'instagram'
+        };
+    }
+    
+    // Verifica se é um username do Instagram (@username)
+    if (contact.startsWith('@')) {
+        return {
+            text: contact,
+            url: `https://instagram.com/${contact.substring(1)}`,
+            type: 'instagram'
+        };
+    }
+    
+    // Verifica se é um link HTTP/HTTPS
+    if (contact.startsWith('http://') || contact.startsWith('https://')) {
+        return {
+            text: contact,
+            url: contact,
+            type: 'website'
+        };
+    }
+    
+    // Se não for nenhum dos formatos acima, retorna como texto simples
+    return {
+        text: contact,
+        url: null,
+        type: 'text'
     };
-    
-    return (
-      <div key={fieldName} className="col-span-1">
-        <label htmlFor={fieldName} className="block text-sm font-medium text-gray-300 mb-1">
-          {fieldDef.label}
-        </label>
-        {fieldDef.type === 'select' ? (
-          <select {...commonProps}>
-            <option value="">Selecione...</option>
-            {fieldDef.options.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        ) : (
-          <input 
-            type={fieldDef.type}
-            step={fieldDef.type === 'number' ? '0.01' : undefined}
-            {...commonProps} 
-          />
-        )}
-      </div>
-    );
-  };
+};
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-        {/* Cabeçalho do Modal */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-700">
-          <h2 className="text-2xl font-bold text-white">
-            {productToEdit ? 'Editar Produto' : 'Adicionar Novo Produto'}
-          </h2>
-          <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-gray-200">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+const INITIAL_FORM_STATE = {
+    category: 'Streaming',
+    product: '',
+    supplier: [], // Alterado para array
+    supplierContact: '', // NOVO CAMPO DE CONTATO
+    purchasePrice: 0.00,
+    sellingPrice: 0.00,
+    purchaseDate: new Date().toISOString().substring(0, 10),
+    saleDate: '',
+    expirationDate: '',
+    duration: '',
+    accountValue: '',
+    accessValue: '',
+    priceValue: '',
+    login: '',
+    socialMedia: '',
+    hasAddons: 'Não',
+    addOnDetails: '',
+};
+
+// Componente Principal
+const App = () => {
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [inventory, setInventory] = useState([]);
+    const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' ou 'inventory'
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+    const [editingId, setEditingId] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [filterCategory, setFilterCategory] = useState('Todos');
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // 1. Inicialização do Firebase
+    useEffect(() => {
+        try {
+            const app = initializeApp(firebaseConfig);
+            const firestore = getFirestore(app);
+            const authInstance = getAuth(app);
+            setDb(firestore);
+            setAuth(authInstance);
+
+            const unsubscribe = onAuthStateChanged(authInstance, async (user) => {
+                if (user) {
+                    setUserId(user.uid);
+                } else {
+                    // Tentativa de login customizado ou anônimo
+                    try {
+                        if (initialAuthToken) {
+                            const userCredential = await signInWithCustomToken(authInstance, initialAuthToken);
+                            setUserId(userCredential.user.uid);
+                        } else {
+                            const userCredential = await signInAnonymously(authInstance);
+                            setUserId(userCredential.user.uid);
+                        }
+                    } catch (e) {
+                        console.error("Erro ao fazer login:", e);
+                        setError("Erro ao autenticar. Tente novamente.");
+                    }
+                }
+                setIsAuthReady(true);
+            });
+            return () => unsubscribe();
+        } catch (e) {
+            console.error("Erro na inicialização do Firebase:", e);
+            setError("Falha ao carregar o banco de dados. Verifique a configuração.");
+            setIsAuthReady(true);
+            setIsLoading(false);
+        }
+    }, []);
+
+    // 2. Listener do Firestore (onSnapshot)
+    useEffect(() => {
+        if (!db || !userId) return;
+
+        const inventoryPath = `artifacts/${appId}/users/${userId}/inventory`;
+        const q = collection(db, inventoryPath);
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const items = [];
+            snapshot.forEach((doc) => {
+                items.push({ id: doc.id, ...doc.data() });
+            });
+            setInventory(items);
+            setIsLoading(false);
+        }, (e) => {
+            console.error("Erro ao carregar o inventário:", e);
+            setError("Erro ao sincronizar dados. Verifique sua conexão.");
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [db, userId]);
+
+    // Funções de CRUD
+    const handleSaveItem = async (e) => {
+        e.preventDefault();
+        if (!db || !userId) {
+            setError("Autenticação não concluída. Tente novamente.");
+            return;
+        }
+
+        // Limpa campos vazios antes de salvar
+        const itemToSave = Object.keys(formData).reduce((acc, key) => {
+            let value = formData[key];
+            
+            // Ignorar campos vazios ou nulos (exceto 'supplier', que deve ser um array, mesmo que vazio)
+            if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) {
+                if (key !== 'supplier') return acc;
+            }
+
+            // Converte preço para float
+            if (key === 'purchasePrice' || key === 'sellingPrice' || key === 'priceValue') {
+                acc[key] = parseFloat(value) || 0.00;
+            } else {
+                acc[key] = value;
+            }
+            return acc;
+        }, {});
+
+        // Garante que 'supplier' é um array antes de salvar
+        if (!Array.isArray(itemToSave.supplier)) {
+            itemToSave.supplier = [];
+        }
+
+
+        const collectionRef = collection(db, `artifacts/${appId}/users/${userId}/inventory`);
+
+        try {
+            if (editingId) {
+                // Update
+                const docRef = doc(collectionRef, editingId);
+                await updateDoc(docRef, itemToSave);
+                console.log("Item atualizado com sucesso!");
+            } else {
+                // Add
+                await addDoc(collectionRef, itemToSave);
+                console.log("Item adicionado com sucesso!");
+            }
+
+            // Resetar formulário e fechar modal
+            setEditingId(null);
+            setFormData(INITIAL_FORM_STATE);
+            setIsFormOpen(false);
+        } catch (e) {
+            console.error("Erro ao salvar o item:", e);
+            setError("Falha ao salvar o item no banco de dados.");
+        }
+    };
+
+    const handleDeleteItem = async (id) => {
+        if (!db || !userId) return;
+
+        // Substituir alert/confirm por um modal simples
+        const confirmed = window.confirm("Tem certeza que deseja deletar este item?");
+        if (!confirmed) return;
+
+        try {
+            const docRef = doc(db, `artifacts/${appId}/users/${userId}/inventory`, id);
+            await deleteDoc(docRef);
+            console.log("Item deletado com sucesso!");
+        } catch (e) {
+            console.error("Erro ao deletar item:", e);
+            setError("Falha ao deletar o item.");
+        }
+    };
+
+    const handleEditItem = (item) => {
+        // Formata os preços para string para o input type="number"
+        const formattedItem = {
+            ...item,
+            purchasePrice: item.purchasePrice ? item.purchasePrice.toFixed(2) : '0.00',
+            sellingPrice: item.sellingPrice ? item.sellingPrice.toFixed(2) : '0.00',
+            priceValue: item.priceValue ? item.priceValue.toFixed(2) : '',
+            // Garante que o fornecedor é um array de strings para o formulário
+            supplier: Array.isArray(item.supplier) ? item.supplier : (item.supplier ? [item.supplier] : []),
+            supplierContact: item.supplierContact || '', // Carrega o contato
+        };
+        setFormData(formattedItem);
+        setEditingId(item.id);
+        setIsFormOpen(true);
+    };
+
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        let newValue = value;
+
+        if (type === 'number') {
+            newValue = parseFloat(value) || 0.00;
+        } else if (type === 'checkbox') {
+            newValue = checked;
+        }
+
+        setFormData(prev => ({ ...prev, [name]: newValue }));
         
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Seletor de Categoria (Sempre primeiro) */}
-            <div className="col-span-1 md:col-span-2">
-              <label htmlFor="category" className="block text-sm font-medium text-gray-300 mb-1">
-                Categoria do Produto
-              </label>
-              <select
-                id="category"
-                name="category"
-                value={selectedCategory}
-                onChange={handleCategoryChange}
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-800 text-white border-gray-700 font-medium"
-              >
-                {Object.keys(CATEGORY_DEFINITIONS).map(key => (
-                  <option key={key} value={key}>{CATEGORY_DEFINITIONS[key].label}</option>
-                ))}
-              </select>
+        // Lógica especial para Add-ons
+        if (name === 'hasAddons') {
+            setFormData(prev => ({ ...prev, addOnDetails: value === 'Sim' ? prev.addOnDetails : '' }));
+        }
+
+        // Se a categoria mudar, reseta campos específicos
+        if (name === 'category' && editingId === null) {
+             setFormData({ ...INITIAL_FORM_STATE, category: value, purchaseDate: new Date().toISOString().substring(0, 10) });
+        }
+    };
+
+    // Nova função para lidar com a seleção múltipla de fornecedores
+    const handleSupplierChange = (option) => {
+        setFormData(prev => {
+            let currentSuppliers = Array.isArray(prev.supplier) ? prev.supplier : [];
+            let newSuppliers;
+
+            if (currentSuppliers.includes(option)) {
+                // Remove option
+                newSuppliers = currentSuppliers.filter(s => s !== option);
+            } else {
+                // Add option
+                newSuppliers = [...currentSuppliers, option];
+            }
+            
+            return { ...prev, supplier: newSuppliers };
+        });
+    };
+
+    // Dados Computados para o Dashboard e Tabela
+    const filteredInventory = useMemo(() => {
+        let items = inventory;
+
+        if (filterCategory !== 'Todos') {
+            items = items.filter(item => item.category === filterCategory);
+        }
+
+        if (searchTerm) {
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            items = items.filter(item =>
+                item.product.toLowerCase().includes(lowerCaseSearch) ||
+                (Array.isArray(item.supplier) ? item.supplier.join(', ').toLowerCase().includes(lowerCaseSearch) : item.supplier.toLowerCase().includes(lowerCaseSearch)) ||
+                item.category.toLowerCase().includes(lowerCaseSearch)
+            );
+        }
+
+        return items;
+    }, [inventory, filterCategory, searchTerm]);
+
+    const dashboardData = useMemo(() => {
+        const stats = {
+            totalItems: inventory.length,
+            totalPurchaseValue: 0,
+            totalSellingValue: 0,
+            expiringSoon: 0, // Expiring in the next 30 days
+            categoryCounts: {},
+            profitDistribution: {}
+        };
+
+        const today = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(today.getDate() + 30);
+
+        inventory.forEach(item => {
+            // Totais
+            stats.totalPurchaseValue += item.purchasePrice || 0;
+            stats.totalSellingValue += item.sellingPrice || 0;
+
+            // Contagem por Categoria
+            stats.categoryCounts[item.category] = (stats.categoryCounts[item.category] || 0) + 1;
+
+            // Itens Expirando
+            if (item.expirationDate) {
+                const expirationDate = new Date(item.expirationDate);
+                if (expirationDate >= today && expirationDate <= thirtyDaysLater) {
+                    stats.expiringSoon += 1;
+                }
+            }
+
+            // Distribuição de Lucro (Exemplo simplificado: agrupado por Preço de Venda)
+            const profit = (item.sellingPrice || 0) - (item.purchasePrice || 0);
+            const profitBucket = profit > 50 ? 'Alto Lucro' : profit > 10 ? 'Lucro Médio' : 'Baixo/Sem Lucro';
+            stats.profitDistribution[profitBucket] = (stats.profitDistribution[profitBucket] || 0) + profit;
+        });
+
+        // Formatação para gráficos
+        const chartData = Object.entries(stats.categoryCounts).map(([name, value]) => ({ name, value }));
+
+        const profitData = Object.entries(stats.profitDistribution).map(([name, value]) => ({ name, value: parseFloat(value.toFixed(2)) }));
+
+        return {
+            ...stats,
+            chartData,
+            profitData,
+            totalProfit: stats.totalSellingValue - stats.totalPurchaseValue
+        };
+    }, [inventory]);
+
+    const Dashboard = ({ data }) => {
+        const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF19A3'];
+
+        const expiringItems = inventory
+            .filter(item => daysUntil(item.expirationDate) !== null && daysUntil(item.expirationDate) >= 0 && daysUntil(item.expirationDate) <= 30)
+            .sort((a, b) => daysUntil(a.expirationDate) - daysUntil(b.expirationDate))
+            .slice(0, 5); // Apenas os 5 mais próximos
+
+        return (
+            <div className="p-4 md:p-8 space-y-8">
+                <h2 className="text-3xl font-extrabold text-white mb-6">Dashboard de Performance</h2>
+                
+                {/* Cartões de Estatísticas */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard 
+                        Icon={Package} 
+                        title="Total de Itens" 
+                        value={data.totalItems} 
+                        color="bg-purple-600"
+                        description={`Limite total: ${ALL_CATEGORIES.reduce((sum, cat) => sum + CATEGORY_CONFIG[cat].limit, 0)}`}
+                    />
+                    <StatCard 
+                        Icon={DollarSign} 
+                        title="Valor de Compra (Estoque)" 
+                        value={formatCurrency(data.totalPurchaseValue)} 
+                        color="bg-pink-600"
+                        description="Valor total investido no estoque atual."
+                    />
+                    <StatCard 
+                        Icon={ArrowUp} 
+                        title="Valor de Venda (Estimado)" 
+                        value={formatCurrency(data.totalSellingValue)} 
+                        color="bg-green-600"
+                        description="Potencial de receita total."
+                    />
+                    <StatCard 
+                        Icon={Clock} 
+                        title="Itens Expirando (30 dias)" 
+                        value={data.expiringSoon} 
+                        color="bg-red-600"
+                        description="Itens com validade próxima. Priorize a venda."
+                    />
+                </div>
+
+                {/* Gráficos */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    {/* Gráfico 1: Itens por Categoria */}
+                    <div className="bg-gray-800 p-4 md:p-6 rounded-xl shadow-lg h-[400px]">
+                        <h3 className="text-xl font-semibold text-white mb-4">Itens por Categoria</h3>
+                        <ResponsiveContainer width="100%" height="85%">
+                            <BarChart data={data.chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#4B5563" />
+                                <XAxis dataKey="name" stroke="#D1D5DB" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={50} />
+                                <YAxis stroke="#D1D5DB" tickFormatter={(value) => value.toFixed(0)} />
+                                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '0.5rem' }} labelStyle={{ color: '#D1D5DB' }} formatter={(value) => [`Qtd: ${value}`, 'Categoria']} />
+                                <Bar dataKey="value" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Gráfico 2: Distribuição de Lucro */}
+                    <div className="bg-gray-800 p-4 md:p-6 rounded-xl shadow-lg h-[400px]">
+                        <h3 className="text-xl font-semibold text-white mb-4">Lucro Estimado por Faixa de Preço</h3>
+                        <ResponsiveContainer width="100%" height="85%">
+                            <PieChart>
+                                <Pie
+                                    data={data.profitData}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={100}
+                                    fill="#8884d8"
+                                    label
+                                >
+                                    {data.profitData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '0.5rem' }} labelStyle={{ color: '#D1D5DB' }} formatter={(value, name) => [formatCurrency(value), name]} />
+                                <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ color: '#D1D5DB' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Tabela de Itens Expirando */}
+                <div className="bg-gray-800 p-4 md:p-6 rounded-xl shadow-lg">
+                    <h3 className="text-xl font-semibold text-red-400 mb-4 flex items-center">
+                        <Calendar className="w-5 h-5 mr-2" /> Itens com Expiração Iminente
+                    </h3>
+                    {expiringItems.length > 0 ? (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-700">
+                                <thead className="bg-gray-700">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Produto</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Categoria</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Expiração</th>
+                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Dias Restantes</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-700 text-sm">
+                                    {expiringItems.map(item => (
+                                        <tr key={item.id} className="hover:bg-gray-700 transition duration-150">
+                                            <td className="px-3 py-2 text-white">{item.product}</td>
+                                            <td className="px-3 py-2 text-gray-400">{item.category}</td>
+                                            <td className="px-3 py-2 text-yellow-400">{formatDate(item.expirationDate)}</td>
+                                            <td className="px-3 py-2 font-bold text-red-500">{daysUntil(item.expirationDate)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (
+                        <p className="text-gray-400">Nenhum item expirando nos próximos 30 dias. Excelente!</p>
+                    )}
+                </div>
+
             </div>
-            
-            {/* Campos Dinâmicos */}
-            {fieldsToRender.map(fieldName => renderField(fieldName))}
+        );
+    };
 
-            {/* Campo especial 'addons' que só aparece se 'hasAddons' for 'Sim' */}
-            {selectedCategory === 'Streaming' && formData.hasAddons === 'Sim' && renderField('addons')}
-            
-          </div>
-        </form>
-
-        {/* Rodapé do Modal */}
-        <div className="flex justify-end items-center p-6 border-t bg-gray-800 border-gray-700 rounded-b-lg">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 mr-3"
-            disabled={isSaving}
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit} // Permite salvar clicando fora do form
-            className={`px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors ${
-              isSaving ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Salvando...' : (productToEdit ? 'Salvar Alterações' : 'Adicionar Produto')}
-          </button>
+    const StatCard = ({ Icon, title, value, color, description }) => (
+        <div className={`p-4 rounded-xl shadow-xl transition transform hover:scale-[1.02] ${color}`}>
+            <div className="flex items-center justify-between">
+                <Icon className="w-8 h-8 text-white" />
+                <span className="text-2xl font-bold text-white">{value}</span>
+            </div>
+            <p className="text-sm font-medium text-gray-100 mt-2">{title}</p>
+            <p className="text-xs text-gray-200 opacity-80 mt-1">{description}</p>
         </div>
-      </div>
-    </div>
-  );
-}
+    );
 
-// --- Funções Utilitárias ---
 
-/**
- * Formata uma string de data (YYYY-MM-DD) para (DD/MM/YYYY)
- */
-function formatDate(dateString) {
-  if (!dateString) return '-';
-  try {
-    const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
-  } catch (e) {
-    return dateString; // Retorna original se falhar
-  }
-}
+    const InventoryTable = ({ items, onEdit, onDelete }) => {
+        const [sortConfig, setSortConfig] = useState({ key: 'purchaseDate', direction: 'descending' });
 
+        const sortedItems = useMemo(() => {
+            let sortableItems = [...items];
+            if (sortConfig !== null) {
+                sortableItems.sort((a, b) => {
+                    let aVal = a[sortConfig.key];
+                    let bVal = b[sortConfig.key];
+                    
+                    // Tratamento especial para Fornecedor e Contato (string ou array)
+                    if (sortConfig.key === 'supplier') {
+                        aVal = Array.isArray(aVal) ? aVal.join(', ').toLowerCase() : (aVal || '').toLowerCase();
+                        bVal = Array.isArray(bVal) ? bVal.join(', ').toLowerCase() : (bVal || '').toLowerCase();
+                    }
+                    else if (sortConfig.key === 'supplierContact') {
+                        aVal = (aVal || '').toLowerCase();
+                        bVal = (bVal || '').toLowerCase();
+                    }
+                    // Tratamento para datas
+                    else if (sortConfig.key.includes('Date')) {
+                        aVal = aVal ? new Date(aVal).getTime() : 0;
+                        bVal = bVal ? new Date(bVal).getTime() : 0;
+                    }
+                    // Tratamento para números
+                    else if (sortConfig.key.includes('Price') || sortConfig.key.includes('Value')) {
+                        aVal = aVal || 0;
+                        bVal = bVal || 0;
+                    }
+                    // Tratamento para strings
+                    else if (typeof aVal === 'string' && typeof bVal === 'string') {
+                        aVal = aVal.toLowerCase();
+                        bVal = bVal.toLowerCase();
+                    }
+
+                    if (aVal < bVal) return sortConfig.direction === 'ascending' ? -1 : 1;
+                    if (aVal > bVal) return sortConfig.direction === 'ascending' ? 1 : -1;
+                    return 0;
+                });
+            }
+            return sortableItems;
+        }, [items, sortConfig]);
+
+        const requestSort = (key) => {
+            let direction = 'ascending';
+            if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+                direction = 'descending';
+            }
+            setSortConfig({ key, direction });
+        };
+
+        const getSortIcon = (key) => {
+            if (sortConfig.key !== key) return null;
+            if (sortConfig.direction === 'ascending') return <ArrowUp className="w-3 h-3 ml-1" />;
+            return <ArrowDown className="w-3 h-3 ml-1" />;
+        };
+
+        const headers = [
+            { key: 'product', label: 'Produto', minWidth: 'min-w-[150px]' },
+            { key: 'category', label: 'Categoria', minWidth: 'min-w-[150px]' },
+            { key: 'supplier', label: 'Fornecedor' },
+            { key: 'supplierContact', label: 'Contato', minWidth: 'min-w-[120px]' }, // NOVO CAMPO
+            { key: 'purchasePrice', label: 'Preço C.', format: formatCurrency },
+            { key: 'sellingPrice', label: 'Preço V.', format: formatCurrency },
+            { key: 'duration', label: 'Duração' },
+            { key: 'expirationDate', label: 'Expiração', format: formatDate },
+            { key: 'purchaseDate', label: 'Data C.', format: formatDate },
+        ];
+
+        return (
+            <div className="overflow-x-auto bg-gray-800 rounded-xl shadow-lg mt-6">
+                <table className="min-w-full divide-y divide-gray-700">
+                    <thead className="bg-gray-700 sticky top-0 z-10">
+                        <tr>
+                            {headers.map((header) => (
+                                <th
+                                    key={header.key}
+                                    onClick={() => requestSort(header.key)}
+                                    className={`px-3 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer transition duration-150 hover:bg-gray-600 ${header.minWidth || ''}`}
+                                >
+                                    <div className="flex items-center">
+                                        {header.label}
+                                        {getSortIcon(header.key)}
+                                    </div>
+                                </th>
+                            ))}
+                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider sticky right-0 bg-gray-700 min-w-[100px]">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-700 text-sm">
+                        {sortedItems.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-700 transition duration-150">
+                                {headers.map((header) => (
+                                    <td key={header.key} className="px-3 py-3 whitespace-nowrap text-gray-300">
+                                        {header.key === 'supplier'
+                                            ? (Array.isArray(item.supplier) ? item.supplier.join(', ') : item.supplier || '-')
+                                            : header.key === 'supplierContact'
+                                                ? (() => {
+                                                    const contactInfo = formatSupplierContact(item.supplierContact);
+                                                    if (contactInfo.url) {
+                                                        return (
+                                                            <a 
+                                                                href={contactInfo.url} 
+                                                                target="_blank" 
+                                                                rel="noopener noreferrer"
+                                                                className="text-indigo-400 hover:text-indigo-300 flex items-center"
+                                                            >
+                                                                {contactInfo.text}
+                                                                <ExternalLink className="w-3 h-3 ml-1" />
+                                                            </a>
+                                                        );
+                                                    }
+                                                    return contactInfo.text || '-';
+                                                })()
+                                                : (header.format ? header.format(item[header.key]) : item[header.key] || '-')}
+                                    </td>
+                                ))}
+                                <td className="px-3 py-3 whitespace-nowrap text-right space-x-2 sticky right-0 bg-gray-800">
+                                    <button
+                                        onClick={() => onEdit(item)}
+                                        className="text-indigo-400 hover:text-indigo-300 transition duration-150 p-1 rounded-full hover:bg-gray-700"
+                                        aria-label="Editar item"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-edit"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                    </button>
+                                    <button
+                                        onClick={() => onDelete(item.id)}
+                                        className="text-red-400 hover:text-red-300 transition duration-150 p-1 rounded-full hover:bg-gray-700"
+                                        aria-label="Deletar item"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                {items.length === 0 && (
+                    <div className="p-4 text-center text-gray-400">Nenhum item encontrado.</div>
+                )}
+            </div>
+        );
+    };
+
+    const InventoryView = () => (
+        <div className="p-4 md:p-8">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 space-y-4 md:space-y-0">
+                <h2 className="text-3xl font-extrabold text-white">Inventário de Produtos ({filteredInventory.length})</h2>
+                <button
+                    onClick={() => { setEditingId(null); setFormData(INITIAL_FORM_STATE); setIsFormOpen(true); }}
+                    className="flex items-center px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150"
+                >
+                    <Plus className="w-5 h-5 mr-2" /> Adicionar Novo Item
+                </button>
+            </div>
+
+            {/* Filtros e Busca */}
+            <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
+                <div className="relative flex-grow">
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por produto, fornecedor ou categoria..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                </div>
+                <select
+                    value={filterCategory}
+                    onChange={(e) => setFilterCategory(e.target.value)}
+                    className="w-full md:w-auto px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                    <option value="Todos">Todas as Categorias</option>
+                    {ALL_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                </select>
+            </div>
+
+            <InventoryTable
+                items={filteredInventory}
+                onEdit={handleEditItem}
+                onDelete={handleDeleteItem}
+            />
+        </div>
+    );
+
+    const Modal = ({ isOpen, onClose, children, title }) => {
+        if (!isOpen) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
+                <div 
+                    className="bg-gray-800 rounded-xl w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl p-6" 
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="flex justify-between items-center pb-3 border-b border-gray-700 mb-4">
+                        <h3 className="text-xl font-bold text-white">{title}</h3>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    {children}
+                </div>
+            </div>
+        );
+    };
+
+    const DynamicForm = () => {
+        const config = CATEGORY_CONFIG[formData.category] || {};
+        const fields = config.fields || [];
+        const labels = config.labels || {};
+
+        const getLabel = (field) => labels[field] || field.replace(/([A-Z])/g, ' $1').replace('accountValue', 'Conta').replace('accessValue', 'Acesso/Tela').replace('priceValue', 'Preço').replace('login', 'Login');
+
+        const isFieldVisible = (field) => {
+             // Regra especial para addOnDetails
+            if (field === 'addOnDetails') {
+                return formData.hasAddons === 'Sim';
+            }
+            return fields.includes(field);
+        };
+
+        const InputField = ({ label, name, type = 'text', required = true, min = undefined, max = undefined, step = undefined, options = [] }) => (
+            <div className="space-y-1">
+                <label htmlFor={name} className="text-sm font-medium text-gray-300 block">
+                    {label} {required && <span className="text-red-500">*</span>}
+                </label>
+                {options.length > 0 ? (
+                    <select
+                        id={name}
+                        name={name}
+                        value={formData[name]}
+                        onChange={handleChange}
+                        required={required}
+                        className="w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    >
+                        {options.map(option => (
+                            <option key={option} value={option}>{option}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <input
+                        type={type}
+                        id={name}
+                        name={name}
+                        value={formData[name]}
+                        onChange={handleChange}
+                        required={required}
+                        min={min}
+                        max={max}
+                        step={step}
+                        placeholder={label}
+                        className="w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                )}
+            </div>
+        );
+        
+        // Componente de seleção múltipla para Fornecedor
+        const SupplierSelection = () => (
+            <div className="space-y-1">
+                <label className="text-sm font-medium text-gray-300 block">
+                    Fornecedor (Origem) <span className="text-red-500">*</span>
+                </label>
+                <div className="flex flex-wrap gap-4 p-3 bg-gray-700 border border-gray-600 rounded-lg">
+                    {SUPPLIER_OPTIONS.map(option => (
+                        <div key={option} className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id={`supplier-${option}`}
+                                name="supplier"
+                                value={option}
+                                checked={formData.supplier.includes(option)}
+                                onChange={() => handleSupplierChange(option)}
+                                className="w-4 h-4 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500"
+                            />
+                            <label htmlFor={`supplier-${option}`} className="ml-2 text-sm text-gray-300 cursor-pointer">
+                                {option}
+                            </label>
+                        </div>
+                    ))}
+                </div>
+                {formData.supplier.length === 0 && (
+                    <p className="text-xs text-red-400 mt-1">Selecione pelo menos uma origem.</p>
+                )}
+            </div>
+        );
+
+
+        return (
+            <form onSubmit={handleSaveItem} className="space-y-4">
+                {/* Campos Principais */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField 
+                        label="Categoria" 
+                        name="category" 
+                        type="select" 
+                        options={ALL_CATEGORIES} 
+                        required={true} 
+                    />
+                    <InputField 
+                        label="Produto (Nome do Item)" 
+                        name="product" 
+                        required={true} 
+                    />
+                </div>
+                
+                {/* Campo de Fornecedor Alterado para Multi-Select */}
+                <SupplierSelection />
+                
+                {/* NOVO CAMPO: Contato do Fornecedor */}
+                <div className="space-y-1">
+                    <label htmlFor="supplierContact" className="text-sm font-medium text-gray-300 block">
+                        Contato do Fornecedor (Telefone, Link do Bot ou Site)
+                    </label>
+                    <input
+                        type="text"
+                        id="supplierContact"
+                        name="supplierContact"
+                        value={formData.supplierContact}
+                        onChange={handleChange}
+                        placeholder="Ex: +55 11 99999-9999, @username, https://t.me/bot, etc."
+                        className="w-full px-3 py-2 bg-gray-700 text-white border border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                        Para WhatsApp: número com DDD. Para Telegram: @username ou link. Para Instagram: @username ou link.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <InputField 
+                        label="Data de Compra" 
+                        name="purchaseDate" 
+                        type="date" 
+                        required={true} 
+                    />
+                    {isFieldVisible('saleDate') && (
+                        <InputField 
+                            label="Data de Venda (Opcional)" 
+                            name="saleDate" 
+                            type="date" 
+                            required={false} 
+                        />
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <InputField 
+                        label="Preço de Compra (R$)" 
+                        name="purchasePrice" 
+                        type="number" 
+                        required={true} 
+                        min="0"
+                        step="0.01"
+                    />
+                    <InputField 
+                        label="Preço de Venda (R$)" 
+                        name="sellingPrice" 
+                        type="number" 
+                        required={true} 
+                        min="0"
+                        step="0.01"
+                    />
+                </div>
+
+                <div className="border-t border-gray-700 pt-4 mt-4 space-y-4">
+                    <h4 className="text-lg font-semibold text-indigo-400">Detalhes Específicos da Categoria</h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Campos Dinâmicos Baseados na Configuração */}
+                        {isFieldVisible('duration') && (
+                            <InputField 
+                                label="Duração (Dias, Meses ou Anos)" 
+                                name="duration" 
+                                required={false} 
+                            />
+                        )}
+                        {isFieldVisible('expirationDate') && (
+                            <InputField 
+                                label="Data de Expiração" 
+                                name="expirationDate" 
+                                type="date" 
+                                required={false} 
+                            />
+                        )}
+                        {isFieldVisible('accountValue') && (
+                            <InputField 
+                                label={getLabel('accountValue')}
+                                name="accountValue" 
+                                required={false} 
+                            />
+                        )}
+                        {isFieldVisible('accessValue') && (
+                            <InputField 
+                                label={getLabel('accessValue')} 
+                                name="accessValue" 
+                                required={false} 
+                            />
+                        )}
+                        {isFieldVisible('priceValue') && (
+                            <InputField 
+                                label={getLabel('priceValue')} 
+                                name="priceValue" 
+                                type="number"
+                                required={false}
+                                min="0"
+                                step="0.01"
+                            />
+                        )}
+                        {isFieldVisible('login') && (
+                            <InputField 
+                                label={getLabel('login')}
+                                name="login" 
+                                required={false} 
+                            />
+                        )}
+                        {isFieldVisible('socialMedia') && (
+                            <InputField 
+                                label={getLabel('socialMedia')}
+                                name="socialMedia" 
+                                required={false} 
+                            />
+                        )}
+                    </div>
+
+                    {/* Campo especial para Streaming (Add-ons) */}
+                    {formData.category === 'Streaming' && (
+                        <div className="space-y-4 border border-gray-700 p-4 rounded-lg">
+                            <InputField 
+                                label={getLabel('hasAddons')}
+                                name="hasAddons" 
+                                type="select"
+                                options={['Não', 'Sim']}
+                                required={true} 
+                            />
+                            {isFieldVisible('addOnDetails') && (
+                                <InputField 
+                                    label={getLabel('addOnDetails') + ' (Ex: 30 Adc Prime, Lista de Canais, etc.)'}
+                                    name="addOnDetails" 
+                                    required={false} 
+                                />
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                    <button
+                        type="submit"
+                        disabled={formData.supplier.length === 0} // Desabilita se não houver fornecedor selecionado
+                        className={`px-6 py-2 text-white font-semibold rounded-lg shadow-md transition duration-150 ${formData.supplier.length === 0 ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'}`}
+                    >
+                        {editingId ? 'Salvar Alterações' : 'Adicionar Item'}
+                    </button>
+                </div>
+            </form>
+        );
+    };
+
+
+    if (isLoading || !isAuthReady) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-gray-900 text-white flex-col">
+                <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+                <p className="mt-4">Carregando dados e autenticando...</p>
+                <p className="text-sm mt-2 text-gray-400">Usuário ID: {userId || 'Autenticando...'}</p>
+                {error && <p className="mt-4 text-red-500">{error}</p>}
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-900 flex flex-col">
+            {/* Header / Nav */}
+            <header className="bg-gray-800 shadow-md sticky top-0 z-20">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                    <div className="flex items-center">
+                        {/* Logo 3JC */}
+                        <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg mr-3">
+                            3JC
+                        </div>
+                        <h1 className="text-2xl font-bold text-indigo-400 flex items-center">
+                            <DollarSign className="w-6 h-6 mr-2" /> Gerenciador de Produtos Digitais
+                        </h1>
+                    </div>
+                    <nav className="flex items-center space-x-4">
+                        <button
+                            onClick={() => setCurrentView('dashboard')}
+                            className={`p-2 rounded-lg transition duration-150 flex items-center text-sm font-medium ${currentView === 'dashboard' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                        >
+                            <LayoutDashboard className="w-5 h-5 mr-1" /> Dashboard
+                        </button>
+                        <button
+                            onClick={() => setCurrentView('inventory')}
+                            className={`p-2 rounded-lg transition duration-150 flex items-center text-sm font-medium ${currentView === 'inventory' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
+                        >
+                            <ListTodo className="w-5 h-5 mr-1" /> Inventário
+                        </button>
+                        {auth && <button
+                            onClick={() => { signOut(auth).catch(e => console.error("Erro ao sair:", e)); }}
+                            className="p-2 rounded-full text-gray-400 hover:text-red-400 hover:bg-gray-700 transition duration-150 ml-4"
+                            title="Sair / Trocar de Usuário"
+                        >
+                            <LogOut className="w-5 h-5" />
+                        </button>}
+                    </nav>
+                </div>
+                <div className="bg-gray-700 py-1 px-4 sm:px-6 lg:px-8">
+                    <p className="text-xs text-right text-gray-400">ID do Usuário: <span className="font-mono text-xs">{userId}</span></p>
+                </div>
+            </header>
+
+            {/* Conteúdo Principal */}
+            <main className="flex-grow max-w-7xl mx-auto w-full">
+                {error && (
+                    <div className="p-4 bg-red-800 text-white rounded-lg m-4">
+                        <p className="font-semibold">Erro:</p>
+                        <p>{error}</p>
+                    </div>
+                )}
+                {currentView === 'dashboard' && <Dashboard data={dashboardData} />}
+                {currentView === 'inventory' && <InventoryView />}
+            </main>
+
+            {/* Modal de Formulário */}
+            <Modal
+                isOpen={isFormOpen}
+                onClose={() => setIsFormOpen(false)}
+                title={editingId ? `Editar Item: ${formData.product}` : `Adicionar Novo Item (${formData.category})`}
+            >
+                <DynamicForm />
+            </Modal>
+        </div>
+    );
+};
+
+export default App;
